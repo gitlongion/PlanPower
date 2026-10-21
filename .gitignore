@@ -1,10 +1,11 @@
-# ---- 构建中间产物 ----
+# ---- 构建产物 ----
+# 白名单式：build/ 下默认全部忽略，只显式放行两个 exe。
+# 反过来写（只列 *.res / initest / xmltest）的问题是——构建脚本以后多产出
+# 一种文件（.pdb、.obj、新的自检可执行文件），它就会被静默提交进来。
 # 两个 exe 是有意保留的：clone 下来直接能用，不必装交叉编译工具链。
-# 除此之外的编译输出（资源、自检可执行文件）都不入库。
-build/*.res
-build/initest
-build/xmltest
-build/_probe.py
+build/*
+!build/PlanPower.exe
+!build/PlanPower-x64.exe
 
 # ---- 运行时数据 ----
 # 程序会在 exe 同目录写配置和日志；这些是每台机器自己的状态，不是项目内容。
@@ -21,3 +22,10 @@ desktop.ini
 *~
 .idea/
 .vscode/
+
+# ---- 构建/自检的临时文件 ----
+*.res
+*.o
+*.obj
+__pycache__/
+*.pyc

@@ -1014,6 +1014,51 @@ ck("void LogLine(const std::wstring& text) { LogLine(text.c_str()); }" in core_c
    "wstring 版没有转发到指针版 —— 两套写盘逻辑")
 
 # ---------------------------------------------------------------------------
+# E24 资源文件的版本号与编码
+#
+# 这两个都是「构建不会失败、只在 Windows 上看得见」的问题：
+#   · 版本号写死在 .rc 里，改了项目版本忘了改它，exe 属性里就一直显示旧版本；
+#   · .rc 里有中文，编译器不声明 UTF-8 就会把字节当 Latin-1，属性里显示乱码。
+# 都属于「用户右键看属性才发现」的类别，静态检查是唯一能提前发现的地方。
+# ---------------------------------------------------------------------------
+rc_src = strip_comments(read_src("planpower.rc"))
+ver = re.search(r"FILEVERSION\s+(\d+),(\d+),(\d+),(\d+)", rc_src)
+ck(ver is not None, "planpower.rc 里找不到 FILEVERSION")
+if ver:
+    major, minor, patch = int(ver.group(1)), int(ver.group(2)), int(ver.group(3))
+    # 版本号的唯一真值来源是 README 里的「当前为 vX.Y.Z 原型」
+    readme = read_root("README.md")
+    rm = re.search(r"当前为 \*\*v(\d+)\.(\d+)\.(\d+)", readme)
+    ck(rm is not None, "README 里找不到「当前为 vX.Y.Z」这句 —— 版本号没有真值来源")
+    if rm:
+        want = (int(rm.group(1)), int(rm.group(2)), int(rm.group(3)))
+        ck((major, minor, patch) == want,
+           "planpower.rc 的版本号 %d.%d.%d 与 README 的 v%d.%d.%d 不一致 —— "
+           "exe 属性里会显示旧版本" % ((major, minor, patch) + want))
+
+    # 字符串表里的两个版本字段必须和 FILEVERSION 一致，否则属性对话框里
+    # 「文件版本」和「产品版本」会各说各话
+    for field in ["FileVersion", "ProductVersion"]:
+        m = re.search(r'VALUE "%s",\s+"([\d.]+)"' % field, rc_src)
+        ck(m is not None, "planpower.rc 里没有 %s 字符串" % field)
+        if m:
+            ck(m.group(1) == "%d.%d.%d.0" % (major, minor, patch),
+               "planpower.rc 的 %s 是 %s，与 FILEVERSION %d.%d.%d.0 不一致"
+               % (field, m.group(1), major, minor, patch))
+
+# 编码：.rc 里有中文就必须显式声明 UTF-8，两个构建脚本都要。
+#
+# 断言查的是**完整命令行**而不是「文件里有没有这个字符串」——这两处参数在
+# 各自的注释里也被提到过（注释在解释为什么必须加它），查子串的话，
+# 把命令行里的参数删掉、注释还在，断言照样通过。踩过一次。
+ck(re.search(r"\$RC\s+--codepage=65001", read_root("build_mingw.sh")) is not None,
+   "build_mingw.sh 的 windres 没带 --codepage=65001 —— .rc 里的中文会被当成 "
+   "Latin-1，exe 属性里显示成乱码（构建不会失败，只有右键看属性才发现）")
+ck(re.search(r"^rc\s+/nologo\s+/c\s+65001",
+             read_root("build_msvc.bat"), re.M) is not None,
+   "build_msvc.bat 的 rc.exe 没带 /c 65001 —— 同样的乱码问题")
+
+# ---------------------------------------------------------------------------
 print("检查项：%d" % checks)
 if fails:
     print("失败 %d 项：" % len(fails))

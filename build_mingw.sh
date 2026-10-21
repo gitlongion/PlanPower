@@ -50,7 +50,10 @@ echo
 mkdir -p build
 
 echo "[1/3] 编译资源..."
-$RC -I src src/planpower.rc -O coff -o build/planpower.res
+# --codepage=65001：.rc 里有中文（FileDescription），必须告诉 windres 按 UTF-8 读。
+# 不加这一条，中文会被当成 Latin-1 逐字节转宽字符，exe 属性里显示成
+# 「PlanPower - å®šæ—¶ç”µæº...」这种乱码。build_msvc.bat 里对应的是 /c 65001。
+$RC --codepage=65001 -I src src/planpower.rc -O coff -o build/planpower.res
 
 echo "[2/3] 编译并链接..."
 # -static 系列 = 等价于 MSVC 的 /MT，静态链接运行库，这是零依赖的关键

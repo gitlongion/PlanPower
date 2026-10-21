@@ -1,6 +1,13 @@
 // ============================================================================
 //  PlanPower - planpower.rc
 //  只包含清单与版本信息；图标在运行时由 GDI 绘制，不引入 .ico 文件
+//
+//  ⚠ 本文件里有中文（FileDescription）。两个构建脚本都必须显式声明按 UTF-8
+//  读这个文件：windres 用 --codepage=65001，rc.exe 用 /c 65001。
+//  漏掉的话编译器会把 UTF-8 字节当成 Latin-1 逐字节转宽字符，exe 属性
+//  里就显示成「PlanPower - å®šæ—¶ç”µæº...」这种乱码。
+//  这个错误不会让构建失败，只会让文件属性难看——所以只能靠人记住，
+//  或者靠 tools/check_layout.py 的 E24 盯着构建脚本。
 // ============================================================================
 #include <winuser.h>
 #include <winver.h>
@@ -8,8 +15,8 @@
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "planpower.manifest"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     0,3,2,0
-PRODUCTVERSION  0,3,2,0
+FILEVERSION     0,4,0,0
+PRODUCTVERSION  0,4,0,0
 FILEFLAGSMASK   0x3fL
 FILEFLAGS       0x0L
 FILEOS          0x40004L
@@ -22,11 +29,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "PlanPower"
             VALUE "FileDescription",  "PlanPower - 定时电源管理器（便携版）"
-            VALUE "FileVersion",      "0.3.2.0"
+            VALUE "FileVersion",      "0.4.0.0"
             VALUE "InternalName",     "PlanPower"
             VALUE "OriginalFilename", "PlanPower.exe"
             VALUE "ProductName",      "PlanPower"
-            VALUE "ProductVersion",   "0.3.2.0"
+            VALUE "ProductVersion",   "0.4.0.0"
             VALUE "LegalCopyright",   "MIT License"
         END
     END

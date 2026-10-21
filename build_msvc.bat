@@ -20,7 +20,10 @@ if errorlevel 1 (
 if not exist build mkdir build
 
 echo [1/3] 编译资源...
-rc /nologo /fo build\planpower.res src\planpower.rc
+REM  /c 65001：.rc 里有中文（FileDescription），必须告诉 rc.exe 按 UTF-8 读。
+REM  不加这一条，中文会被当成 Latin-1 逐字节转宽字符，exe 属性里显示成
+REM  「PlanPower - å®šæ—¶ç”µæº...」这种乱码。
+rc /nologo /c 65001 /fo build\planpower.res src\planpower.rc
 if errorlevel 1 goto :fail
 
 echo [2/3] 编译并链接...

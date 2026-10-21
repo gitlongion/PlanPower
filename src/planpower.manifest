@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity type="win32" name="PlanPower" version="0.1.0.0" processorArchitecture="*"/>
+  <!-- 这个 version 是 SxS 程序集标识，不是产品版本号（产品版本在 planpower.rc 里）。
+       本程序没有私有程序集依赖，这个值不参与任何解析，只要求前后一致。 -->
+  <assemblyIdentity type="win32" name="PlanPower" version="0.4.0.0" processorArchitecture="*"/>
   <description>PlanPower - 定时电源管理器（便携版）</description>
 
   <!-- 启用 Common Controls 6.0 视觉样式 -->
