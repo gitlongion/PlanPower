@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlanPower · 便携版与零依赖专项设计</title>
+<style>
+  :root{
+    --bg:#f5f6f8;
+    --card:#ffffff;
+    --ink:#1f2937;
+    --ink-2:#4b5563;
+    --ink-3:#6b7280;
+    --line:#e5e7eb;
+    --line-2:#eef0f3;
+    --brand:#2563eb;
+    --brand-soft:#eff4ff;
+    --teal:#0d9488;
+    --teal-soft:#effaf8;
+    --amber:#b45309;
+    --amber-soft:#fff8ec;
+    --red:#b91c1c;
+    --red-soft:#fef2f2;
+    --violet:#6d28d9;
+    --violet-soft:#f5f3ff;
+    --radius:10px;
+    --mono:"SF Mono",Menlo,Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 80px;}
+
+  /* Hero */
+  .hero{
+    background:linear-gradient(135deg,#0f766e 0%,#0d9488 45%,#2563eb 100%);
+    color:#fff;padding:56px 24px 48px;margin-bottom:36px;
+  }
+  .hero-inner{max-width:1080px;margin:0 auto;}
+  .hero .tag{
+    display:inline-block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);
+    padding:5px 12px;border-radius:999px;margin-bottom:18px;
+  }
+  .hero h1{margin:0 0 10px;font-size:34px;line-height:1.3;font-weight:700;letter-spacing:-.01em;}
+  .hero p.sub{margin:0;font-size:16px;color:rgba(255,255,255,.9);max-width:780px;}
+  .hero .meta{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px;}
+  .hero .meta span{
+    font-size:12.5px;background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.22);border-radius:6px;padding:5px 11px;
+  }
+
+  section{margin-bottom:44px;}
+  h2{
+    font-size:22px;margin:0 0 6px;font-weight:700;letter-spacing:-.01em;
+    display:flex;align-items:center;gap:10px;
+  }
+  h2 .num{
+    flex:none;width:30px;height:30px;border-radius:8px;background:var(--teal);color:#fff;
+    font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  }
+  h2 + .lede{color:var(--ink-3);font-size:14px;margin:0 0 20px 40px;}
+  h3{font-size:16.5px;margin:28px 0 10px;font-weight:650;}
+  h4{font-size:14.5px;margin:20px 0 8px;font-weight:650;color:var(--ink-2);}
+  p{margin:0 0 12px;}
+  ul,ol{margin:0 0 14px;padding-left:22px;}
+  li{margin-bottom:5px;}
+  code{
+    font-family:var(--mono);font-size:12.5px;background:#eef2f7;color:#1e3a8a;
+    padding:1.5px 6px;border-radius:4px;white-space:nowrap;
+  }
+  pre{
+    background:#0f172a;color:#e2e8f0;border-radius:var(--radius);
+    padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;
+    line-height:1.65;margin:0 0 16px;
+  }
+  pre code{background:none;color:inherit;padding:0;white-space:pre;}
+  pre .c{color:#7c8ba1;}
+  pre .k{color:#7dd3fc;}
+  pre .s{color:#a5e8b5;}
+  pre .t{color:#fca5a5;}
+  pre .n{color:#fcd34d;}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin-bottom:16px;}
+  .card.tight{padding:16px 18px;}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  @media(max-width:820px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:#fff;margin-bottom:18px;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;background:#f8fafc;color:var(--ink-2);font-weight:650;padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:13px;}
+  td{padding:11px 14px;border-bottom:1px solid var(--line-2);vertical-align:top;color:var(--ink-2);}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#fafbfc;}
+  td strong{color:var(--ink);font-weight:600;}
+  td code{white-space:normal;}
+  .yes{color:#0d9488;font-weight:700;}
+  .no{color:#dc2626;font-weight:700;}
+  .mid{color:#b45309;font-weight:700;}
+
+  .b{display:inline-block;font-size:11.5px;font-weight:650;padding:2px 8px;border-radius:5px;white-space:nowrap;}
+  .b-p0{background:var(--red-soft);color:var(--red);border:1px solid #fecaca;}
+  .b-p1{background:var(--amber-soft);color:var(--amber);border:1px solid #fde68a;}
+  .b-p2{background:var(--brand-soft);color:var(--brand);border:1px solid #bfdbfe;}
+  .b-new{background:var(--teal-soft);color:var(--teal);border:1px solid #99f6e4;}
+  .b-tag{background:#f1f5f9;color:var(--ink-3);border:1px solid var(--line);}
+
+  .note{border-left:3px solid var(--brand);background:var(--brand-soft);border-radius:0 var(--radius) var(--radius) 0;padding:13px 18px;margin:0 0 16px;font-size:14px;}
+  .note.warn{border-left-color:#f59e0b;background:var(--amber-soft);}
+  .note.danger{border-left-color:#dc2626;background:var(--red-soft);}
+  .note.ok{border-left-color:var(--teal);background:var(--teal-soft);}
+  .note b{color:var(--ink);}
+  .note p:last-child{margin-bottom:0;}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px;}
+  @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr);}}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;}
+  .kpi .v{font-size:21px;font-weight:700;color:var(--teal);letter-spacing:-.02em;}
+  .kpi .l{font-size:12.5px;color:var(--ink-3);margin-top:2px;}
+
+  .toc{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px 22px;margin-bottom:36px;}
+  .toc h4{margin:0 0 10px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);}
+  .toc ol{margin:0;padding-left:0;list-style:none;counter-reset:t;display:grid;grid-template-columns:1fr 1fr;gap:4px 26px;}
+  @media(max-width:820px){.toc ol{grid-template-columns:1fr;}}
+  .toc li{counter-increment:t;font-size:14px;margin:0;padding:3px 0;}
+  .toc li::before{content:counter(t) ". ";color:var(--teal);font-weight:650;}
+  .toc a{color:var(--ink);text-decoration:none;border-bottom:1px solid transparent;}
+  .toc a:hover{border-bottom-color:var(--teal);color:var(--teal);}
+
+  .diagram{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:18px;overflow-x:auto;}
+
+  /* checklist */
+  .chk{list-style:none;padding-left:0;}
+  .chk li{
+    position:relative;padding-left:30px;margin-bottom:8px;font-size:14px;color:var(--ink-2);
+  }
+  .chk li::before{
+    content:"";position:absolute;left:0;top:4px;width:17px;height:17px;border-radius:5px;
+    border:1.5px solid #cbd5e1;background:#fff;
+  }
+  .chk li b{color:var(--ink);}
+
+  footer{border-top:1px solid var(--line);padding-top:22px;margin-top:44px;font-size:13px;color:var(--ink-3);}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-inner">
+    <span class="tag">Revision 2 · 便携版与零依赖专项设计</span>
+    <h1>PlanPower 便携版</h1>
+    <p class="sub">单文件、免安装、零依赖。复制到任意目录（含 U 盘）即可运行，不写注册表、不装运行库、不留残留。本文明确其功能范围、使用方式、运行环境要求，以及便携性与零依赖的具体保证手段。</p>
+    <div class="meta">
+      <span>修订技术栈 C++17 + Win32 API</span>
+      <span>静态链接 CRT（/MT）</span>
+      <span>目标体积约 300 KB</span>
+      <span>零子进程 · 零注册表</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<div class="note danger" style="margin-bottom:26px">
+  <p><b>重要：本次需求推翻了 Revision 1 的技术选型。</b>上一版推荐的 <b>C# + WPF + .NET Framework 4.8</b> 方案，在「免安装」这一项上是达标的，但在「不依赖系统组件」这一项上不达标——.NET Framework 是 Windows 的<b>可选功能</b>，可以在「启用或关闭 Windows 功能」中被禁用；Windows 10 1809 及更早版本预装的是 4.7.2 或更低，并不保证有 4.8。若用户的机器上恰好缺了这个组件，软件就直接起不来，这与「开箱即用」的目标冲突。</p>
+  <p>因此技术栈修订为 <b>C++17 + Win32 原生 API + 静态链接 C 运行库</b>。功能设计、界面设计、竞品调研、技术坑清单仍然沿用 Revision 1，本文只覆盖与便携性和零依赖相关的部分。</p>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="v">1 个</div><div class="l">发布文件（PlanPower.exe）</div></div>
+  <div class="kpi"><div class="v">0 个</div><div class="l">需要安装的运行库 / 框架</div></div>
+  <div class="kpi"><div class="v">0 处</div><div class="l">注册表写入（默认配置下）</div></div>
+  <div class="kpi"><div class="v">约 300 KB</div><div class="l">目标体积（x86 单文件）</div></div>
+</div>
+
+<div class="toc">
+  <h4>目录</h4>
+  <ol>
+    <li><a href="#s1">需求边界澄清：什么叫「零依赖」</a></li>
+    <li><a href="#s2">技术栈修订与论证</a></li>
+    <li><a href="#s3">功能范围（便携版口径）</a></li>
+    <li><a href="#s4">使用方式</a></li>
+    <li><a href="#s5">运行环境要求</a></li>
+    <li><a href="#s6">便携性保证措施</a></li>
+    <li><a href="#s7">零依赖保证措施</a></li>
+    <li><a href="#s8">核心 API 映射（替代外部命令）</a></li>
+    <li><a href="#s9">验收清单</a></li>
+    <li><a href="#s10">已知限制与风险</a></li>
+  </ol>
+</div>
+
+<!-- ===== 1 ===== -->
+<section id="s1">
+  <h2><span class="num">1</span>需求边界澄清：什么叫「零依赖」</h2>
+  <p class="lede">这一节必须先讲清楚，否则后面所有的技术决策都站不住脚。</p>
+
+  <p>「不依赖外部运行环境、第三方库或系统组件」这句话里，<strong>「不依赖系统组件」在技术上是不可能实现的</strong>。任何一个 Windows 程序的进程创建、内存分配、窗口绘制、文件读写，都必须调用 <code>kernel32.dll</code>、<code>user32.dll</code>、<code>gdi32.dll</code>——这些就是系统组件，且无法绕过（除非自己写操作系统）。</p>
+
+  <p>所以真正可执行、可验收的定义应该按依赖的<strong>性质</strong>来划分，而不是按「是不是系统提供的」来划分：</p>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>层级</th><th>定义</th><th>本方案</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>L1 免安装</strong></td>
+        <td>不需要 setup / msi，复制文件即可运行；卸载 = 删除文件</td>
+        <td class="yes">✅ 达成</td>
+        <td>单 exe，无安装程序、无卸载项</td>
+      </tr>
+      <tr>
+        <td><strong>L2 无外部运行时</strong></td>
+        <td>不需要用户额外安装或启用任何运行时、框架、运行库</td>
+        <td class="yes">✅ 达成</td>
+        <td>排除 .NET / Python / Java / Node / VC++ Redist / WebView2</td>
+      </tr>
+      <tr>
+        <td><strong>L3 无第三方库</strong></td>
+        <td>不链接任何非微软官方发布的库，包括静态库与纯头文件库</td>
+        <td class="yes">✅ 达成</td>
+        <td>零 NuGet、零 vcpkg、零 vendor 目录</td>
+      </tr>
+      <tr>
+        <td><strong>L4 无系统 API 依赖</strong></td>
+        <td>不调用任何 Windows 系统 DLL</td>
+        <td class="no">❌ 不可能</td>
+        <td>技术上的伪命题，见上文说明</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note ok">
+    <p><b>本方案采用的验收口径（建议以此为准）：</b></p>
+    <p>「不依赖任何<strong>需要用户额外安装、启用或配置</strong>的组件；只使用 Windows 安装完成后<strong>默认存在且无法卸载</strong>的核心系统库。」</p>
+    <p>按这个口径，依赖清单被严格约束为一张白名单（见 §7.2），凡是不在白名单里的 DLL，一律视为违规。</p>
+  </div>
+
+  <h3>必须排除的「伪零依赖」陷阱</h3>
+  <p>下面这些方案经常被当成「免安装」，但它们都不满足 L2：</p>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>方案</th><th>为什么不合格</th></tr></thead>
+    <tbody>
+      <tr><td>C# + .NET Framework 4.8</td><td>属于 Windows <strong>可选功能</strong>，可被禁用；Win10 1809 及更早版本不预装 4.8。用户机器上缺了就起不来</td></tr>
+      <tr><td>C# + .NET 8/9/10 自包含单文件</td><td>运行时不缺，但体积 10–15 MB，且 NativeAOT 产物在部分配置下仍会依赖 MSVC 运行库</td></tr>
+      <tr><td>Python + PyInstaller 打包</td><td>体积 15–40 MB，解包到临时目录，极易被 Windows Defender 启发式查杀（这是最典型的误报来源）</td></tr>
+      <tr><td>Electron / Tauri 套壳</td><td>WebView2 在 Win10 上<strong>需要单独安装</strong>，Win11 才预装。直接违反 L2</td></tr>
+      <tr><td>PowerShell + WinForms 脚本</td><td>启动慢、有控制台闪窗、脚本可被 ExecutionPolicy 拦截，且不是「软件」形态</td></tr>
+      <tr><td>MSVC 默认编译（<code>/MD</code>）</td><td>会依赖 <code>vcruntime140.dll</code> + <code>msvcp140.dll</code>，目标机器没装 VC++ Redist 就直接报「缺少 DLL」。这是 C++ 便携版最常见的翻车点</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ===== 2 ===== -->
+<section id="s2">
+  <h2><span class="num">2</span>技术栈修订与论证</h2>
+  <p class="lede">从 C# + WPF 改为 C++17 + Win32，这是一次「用开发成本换依赖纯度」的明确取舍。</p>
+
+  <h3>2.1 方案对比</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr><th>维度</th><th>Revision 1<br>C# + WPF + .NET FW 4.8</th><th>Revision 2（采用）<br>C++17 + Win32 + 静态 CRT</th><th>C# + NativeAOT</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>免安装</td><td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td></tr>
+      <tr><td>需要外部运行时</td><td class="mid">⚠️ 需要 .NET Framework</td><td class="yes">❌ 不需要</td><td class="yes">❌ 不需要</td></tr>
+      <tr><td>需要 VC++ 运行库</td><td class="yes">不需要</td><td class="yes">不需要（/MT 静态链接）</td><td class="mid">视配置而定</td></tr>
+      <tr><td>发布文件数</td><td class="mid">2–4 个（exe + 依赖 dll）</td><td class="yes"><strong>1 个</strong></td><td class="yes">1 个</td></tr>
+      <tr><td>体积</td><td>约 500 KB – 1 MB</td><td class="yes"><strong>约 300 KB</strong></td><td class="mid">5–15 MB</td></tr>
+      <tr><td>冷启动耗时</td><td class="mid">100–300 ms（CLR 初始化）</td><td class="yes"><strong>约 20 ms</strong></td><td class="mid">50–150 ms</td></tr>
+      <tr><td>内存占用</td><td class="mid">40–80 MB</td><td class="yes"><strong>8–15 MB</strong></td><td class="mid">30–60 MB</td></tr>
+      <tr><td>U 盘即插即用</td><td class="mid">可行，需配置重定向</td><td class="yes">天然支持</td><td class="yes">天然支持</td></tr>
+      <tr><td>UI 开发成本</td><td class="yes">低（XAML 绑定）</td><td class="no">高（手写 GDI 自绘）</td><td class="mid">中（WinForms 支持有限）</td></tr>
+      <tr><td>杀软误报风险</td><td>低</td><td>低（无解包行为）</td><td>低</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <p><b>选型结论：</b>采用 <b>C++17 + Win32 原生 API + 静态链接 CRT</b>。</p>
+    <p>理由：这是唯一能同时满足 L1 + L2 + L3 且体积可控的方案。代价是 UI 需要手写 GDI 自绘，开发工作量约为 WPF 方案的 2–3 倍。考虑到界面结构并不复杂（一个列表、一个三步向导、一个悬浮窗、一个托盘菜单），这个代价是可控的。</p>
+  </div>
+
+  <h3>2.2 编译配置（关键，决定了能不能做到零依赖）</h3>
+  <pre><code><span class="c">:: 编译器</span>
+cl /std:c++17 /O2 /GS /GL /utf-8 ^
+   <span class="n">/MT</span>                      <span class="c">:: ★ 静态链接 CRT —— 零依赖的关键，绝不能用 /MD</span>
+   /DUNICODE /D_UNICODE ^     <span class="c">:: 全程宽字符，正确处理中文路径</span>
+   /DWIN32_LEAN_AND_MEAN ^
+   /D_CRT_SECURE_NO_WARNINGS
+
+<span class="c">:: 链接器</span>
+link /LTCG /OPT:REF /OPT:ICF ^
+     <span class="n">/SUBSYSTEM:WINDOWS</span> ^     <span class="c">:: 无控制台窗口</span>
+     /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA ^   <span class="c">:: 安全加固</span>
+     /MANIFEST:EMBED /MANIFESTINPUT:PlanPower.manifest ^
+     kernel32.lib user32.lib gdi32.lib advapi32.lib shell32.lib ^
+     comctl32.lib ole32.lib oleaut32.lib powrprof.lib shlwapi.lib ^
+     <span class="n">/ENTRY:wWinMainCRTStartup</span></code></pre>
+
+  <div class="note warn">
+    <p><b>三个必须注意的编译期细节：</b></p>
+    <p>① <code>/MT</code> 必须与所有链接的静态库一致，若混入 <code>/MD</code> 编译的 <code>.lib</code> 会链接失败或运行时崩溃；</p>
+    <p>② 显式指定 <code>/ENTRY:wWinMainCRTStartup</code>（配合 <code>/MT</code>），避免因未定义 <code>wWinMain</code> 而误用控制台入口；</p>
+    <p>③ 资源（图标、字符串、UI 模板）全部编入 <code>.rc</code>，运行时<strong>不读取任何外部文件</strong>——这是「单文件」的硬要求。</p>
+  </div>
+
+  <h3>2.3 目标架构：为什么建议发 x86</h3>
+  <p>把主版本编译为 <strong>32 位（x86）</strong>，可以得到最大的兼容性：</p>
+  <ul>
+    <li>在 64 位 Windows 10 / 11 上以 WOW64 方式原生运行，无性能问题（本程序不做重计算）</li>
+    <li>在 32 位 Windows 上同样可运行——一个文件通吃</li>
+    <li>在 Windows on ARM 设备上可通过 x86 模拟层运行</li>
+  </ul>
+  <p>代价是：x86 进程受文件系统重定向影响（<code>System32</code> 会被重定向到 <code>SysWOW64</code>）。由于本程序不使用文件系统重定向敏感的路径，实际无影响。如果不需要兼容 32 位系统，也可以只发 x64 版本。</p>
+</section>
+
+<!-- ===== 3 ===== -->
+<section id="s3">
+  <h2><span class="num">3</span>功能范围（便携版口径）</h2>
+  <p class="lede">便携约束会砍掉一些功能，也会让另一些功能需要重新设计。这里逐项说明。</p>
+
+  <h3>3.1 完整保留（不受便携约束影响）</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>功能</th><th>说明</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td><strong>七种电源动作</strong></td><td>关机、重启、睡眠、休眠、注销、锁定、关闭显示器</td><td><span class="b b-new">保留</span></td></tr>
+      <tr><td><strong>倒计时 / 指定时刻</strong></td><td>内存计时，免提权，可暂停与修改</td><td><span class="b b-new">保留</span></td></tr>
+      <tr><td><strong>提前提醒 + 一键取消</strong></td><td>执行前 N 秒弹出置顶窗口，可取消本次</td><td><span class="b b-new">保留</span></td></tr>
+      <tr><td><strong>任务 CRUD + 启停 + 立即执行</strong></td><td>创建、编辑、删除、启用、停用、立即跑一次</td><td><span class="b b-new">保留</span></td></tr>
+      <tr><td><strong>托盘常驻与快捷菜单</strong></td><td>快速 30 / 60 / 120 分钟关机、取消倒计时、立即睡眠</td><td><span class="b b-new">保留</span></td></tr>
+      <tr><td><strong>任务模板</strong></td><td>内置常用预设，编译进 exe 资源</td><td><span class="b b-new">保留</span></td></tr>
+      <tr><td><strong>执行日志</strong></td><td>本地记录，可关闭</td><td><span class="b b-new">保留</span></td></tr>
+      <tr><td><strong>导入 / 导出配置</strong></td><td>导出为单个 <code>.ppconfig</code> 文件，便于跨机迁移</td><td><span class="b b-new">保留</span></td></tr>
+      <tr><td><strong>命令行接口</strong></td><td><code>PlanPower.exe /shutdown 30 /quiet</code>，执行后立即退出</td><td><span class="b b-new">保留</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>3.2 需要重新设计的功能</h3>
+
+  <div class="card">
+    <h4 style="margin-top:0">① 系统级持久任务 → 改为「显式可选 + 可一键清理」</h4>
+    <p><b>冲突：</b>「任务跨重启存活」需要写入 Windows 任务计划程序，这会<strong>污染宿主系统</strong>，与「便携、不留痕」直接矛盾。而且 U 盘拔走后，如果任务还留在那台机器上，就是残留。</p>
+    <p><b>解决：</b>把它做成一个显式开关，默认关闭，并配套清理机制。</p>
+    <ul>
+      <li>默认状态：<strong>关闭</strong>。所有任务走内存计时引擎，完全不留痕，拔盘即消失。</li>
+      <li>开启时：弹出说明，明确告知「将在本机任务计划程序中创建任务，离开本机前请点击『清理全部系统任务』」。需要 UAC 提权。</li>
+      <li>便携模式专属选项：「<strong>退出时自动清理系统任务</strong>」——勾选后，程序退出即删除自己注册的全部系统任务，实现零残留。</li>
+      <li>界面上用一个醒目的标记区分两类任务：<span class="b b-tag">内存任务</span>（不留痕）与 <span class="b b-p1">系统任务</span>（写入本机）。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h4 style="margin-top:0">② 开机自启 → 默认关闭，改为启动文件夹方式</h4>
+    <p><b>冲突：</b>便携版通常在 U 盘上，U 盘未必插着，「开机自启」意义不大；而且写 <code>HKCU\...\Run</code> 属于注册表污染。</p>
+    <p><b>解决：</b>默认关闭。若用户显式开启，优先使用<strong>「启动」文件夹快捷方式</strong>（写文件，不写注册表），并在界面标注「本机专属设置，不会随 U 盘带走」。</p>
+  </div>
+
+  <div class="card">
+    <h4 style="margin-top:0">③ 自动更新 → 取消</h4>
+    <p>只读介质（部分 U 盘、光盘）无法自更新，且联网检查更新会引入隐私顾虑和杀软关注。便携版明确不提供自更新，改为在「关于」页展示版本号与手动下载地址。</p>
+  </div>
+
+  <div class="card">
+    <h4 style="margin-top:0">④ 收尾动作中的「执行自定义脚本」→ 路径规则收紧</h4>
+    <p>如果允许执行外部脚本，脚本路径必须是<strong>相对于 exe 目录</strong>的相对路径，运行时动态解析。绝不持久化绝对路径——否则换台机器盘符一变就失效。</p>
+  </div>
+
+  <h3>3.3 明确不做</h3>
+  <div class="grid-2">
+    <div class="card tight">
+      <h4 style="margin-top:0">不做安装程序</h4>
+      <p style="margin:0;font-size:13.5px">没有 setup.exe、没有 msi、不写 Program Files、不创建卸载项。</p>
+    </div>
+    <div class="card tight">
+      <h4 style="margin-top:0">不做 Windows 服务</h4>
+      <p style="margin:0;font-size:13.5px">注册服务需要写注册表且需要管理员权限，与便携目标冲突。</p>
+    </div>
+    <div class="card tight">
+      <h4 style="margin-top:0">不做文件关联 / 右键菜单</h4>
+      <p style="margin:0;font-size:13.5px">这两者都必须写注册表，是典型的「安装行为」。</p>
+    </div>
+    <div class="card tight">
+      <h4 style="margin-top:0">不做联网功能</h4>
+      <p style="margin:0;font-size:13.5px">不检查更新、不收集统计、不加载任何远程资源。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 4 ===== -->
+<section id="s4">
+  <h2><span class="num">4</span>使用方式</h2>
+  <p class="lede">从拿到文件到跑起来，只有一步。</p>
+
+  <h3>4.1 部署</h3>
+  <div class="note ok">
+    <p><b>把 <code>PlanPower.exe</code> 复制到任意位置，双击。</b>没有别的步骤。</p>
+    <p>可以是桌面、D 盘某个文件夹、U 盘根目录、甚至网盘同步目录。程序不关心自己在哪，只关心自己旁边能不能写文件。</p>
+  </div>
+
+  <h3>4.2 首次运行</h3>
+  <ol>
+    <li>双击 <code>PlanPower.exe</code>（不需要右键「以管理员身份运行」，除非你要注册系统任务）。</li>
+    <li>程序检测到没有配置文件，显示欢迎页，列出三个常用模板卡片：「下班关机」「下载完关机」「睡前休眠」。</li>
+    <li>底部显示当前<strong>存储位置</strong>（例如 <code>E:\Tools\PlanPower\</code>），并提供切换按钮。默认就写在 exe 同目录。</li>
+    <li>点任一模板卡片，或点「从零创建」，进入三步向导。</li>
+    <li>完成后窗口最小化到托盘，任务开始计时。</li>
+  </ol>
+
+  <h3>4.3 日常使用</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>我想……</th><th>怎么做</th></tr></thead>
+    <tbody>
+      <tr><td>30 分钟后关机</td><td>托盘图标右键 → 「30 分钟后关机」</td></tr>
+      <tr><td>每天固定时间关机</td><td>主界面 → 「＋ 新建任务」→ 选关机 → 选「每天」→ 填时间</td></tr>
+      <tr><td>临时取消</td><td>托盘右键 → 「取消当前倒计时」；或点悬浮窗上的「取消本次」</td></tr>
+      <tr><td>看看有哪些任务</td><td>托盘双击，或右键 → 「打开主界面」</td></tr>
+      <tr><td>彻底退出</td><td>托盘右键 → 「退出」（关闭窗口只是最小化到托盘）</td></tr>
+      <tr><td>换个机器用</td><td>把 exe（以及同目录的 <code>PlanPower.ini</code>）一起复制过去</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>4.4 数据文件</h3>
+  <p>默认情况下，程序运行后会在 exe 同目录产生以下文件（也可以一个都不产生，见 §6.2 的只读介质策略）：</p>
+  <pre><code>E:\Tools\PlanPower\
+├─ PlanPower.exe          <span class="c">← 唯一的程序文件</span>
+├─ PlanPower.ini          <span class="c">← 设置与任务定义（INI 格式，可用记事本编辑）</span>
+├─ logs\                  <span class="c">← 执行日志（可在设置中关闭）</span>
+│   └─ 2026-10.log
+└─ portable.flag          <span class="c">← 可选：存在此文件则强制便携模式</span></code></pre>
+
+  <div class="note">
+    <p><b>为什么用 INI 而不是 JSON？</b>人类可读、可以直接用记事本改、出问题时容易排查，而且格式本身简单到可以自己写解析器（约 300 行，含 UTF-16/UTF-8 编解码）。</p>
+    <p>每个任务写成一个 <code>[Task.&lt;n&gt;]</code> 段，字段扁平化存储，足以表达全部配置；本机归属表另开 <code>[Host.&lt;机器指纹&gt;]</code> 段。</p>
+  </div>
+
+  <div class="note warn">
+    <p><b>为什么最终没用 kernel32 自带的 <code>GetPrivateProfileStringW</code> / <code>WritePrivateProfileStringW</code>？</b>这两个 API 看着最省事，但有两个要命的性质：</p>
+    <ol>
+      <li><b>进程内缓存整个文件的映射，写入先进缓存、延迟落盘。</b></li>
+      <li><b>缓存里会留着上一版的陈旧键值</b>，所以「先 <code>DeleteFile</code> 再重写」这个手法对它无效——删掉的段会自己长回来。</li>
+    </ol>
+    <p>而 PlanPower 的工作方式是：保存配置后<b>立刻</b> <code>ShellExecuteEx(runas)</code> 拉起提权助手进程，助手从<b>磁盘</b>读同一个 INI。于是助手读到的要么是旧内容、要么文件根本还不存在。这就是 v0.2 那次真机反馈「注册系统任务失败」的主因——「找不到任务」被伪装成了「注册失败」。</p>
+    <p><b>现在改成自己实现</b>（<code>src/inifile.h</code> / <code>src/inifile.cpp</code>）：整段拼好后写 <code>PlanPower.ini.tmp</code> → <code>FlushFileBuffers</code> → <code>MoveFileExW(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)</code> 原子替换。刷盘那一步不能省，它就是「跨进程可见性」的全部保障；原子替换保证读者要么看到旧的完整文件、要么看到新的完整文件。</p>
+    <p>格式仍然是 INI，仍然是 UTF-16LE + BOM，记事本照样能改——<b>便携性与零依赖这两条约束一点没变</b>：这一层只依赖 <code>&lt;string&gt;</code> / <code>&lt;vector&gt;</code>，不引入任何第三方库，也不增加任何运行时依赖。</p>
+  </div>
+
+  <h3>4.5 卸载</h3>
+  <ol>
+    <li>如果开启过「系统任务」，先在主界面点「清理全部系统任务」（或手动在任务计划程序里删除 <code>\PlanPower</code> 文件夹）。</li>
+    <li>删除 <code>PlanPower.exe</code> 及其同目录的配置文件与日志目录。</li>
+  </ol>
+  <p>完毕。没有注册表残留，没有 Program Files 残留，没有后台服务。</p>
+</section>
+
+<!-- ===== 5 ===== -->
+<section id="s5">
+  <h2><span class="num">5</span>运行环境要求</h2>
+  <p class="lede">要求越少，越不容易出问题。这里把「必须」和「不需要」都列清楚。</p>
+
+  <h3>5.1 必须具备</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>项目</th><th>要求</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><strong>操作系统</strong></td><td>Windows 10（1607 及以上）/ Windows 11</td><td>向下兼容 Windows 8.1 / 7 SP1（需使用 API 子集，见 §7.4）</td></tr>
+      <tr><td><strong>CPU 架构</strong></td><td>x86 / x64 / ARM64</td><td>发布 x86 单文件即可全覆盖；ARM64 通过模拟层运行</td></tr>
+      <tr><td><strong>磁盘空间</strong></td><td>约 1 MB（含日志）</td><td>日志可在设置中限制大小或关闭</td></tr>
+      <tr><td><strong>可写目录</strong></td><td>程序目录可写，<em>或</em> 用户目录可写</td><td>两者都不可写时程序仍能运行，但配置不保存（见 §6.2）</td></tr>
+      <tr><td><strong>权限</strong></td><td>标准用户即可</td><td>仅「注册系统计划任务」功能需要管理员权限，属可选功能</td></tr>
+      <tr><td><strong>显示</strong></td><td>1024×768 及以上</td><td>支持 100% / 125% / 150% / 200% DPI 缩放</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>5.2 明确不需要</h3>
+  <div class="grid-2">
+    <div class="card tight"><h4 style="margin-top:0">❌ 不需要 .NET Framework</h4><p style="margin:0;font-size:13.5px">无论 2.0 / 4.x / 8 / 9 / 10，一律不依赖。</p></div>
+    <div class="card tight"><h4 style="margin-top:0">❌ 不需要 VC++ 运行库</h4><p style="margin:0;font-size:13.5px">CRT 已静态链接，无 <code>vcruntime140.dll</code> 依赖。</p></div>
+    <div class="card tight"><h4 style="margin-top:0">❌ 不需要 WebView2 / Edge</h4><p style="margin:0;font-size:13.5px">界面为原生 GDI 绘制，不用任何 Web 渲染。</p></div>
+    <div class="card tight"><h4 style="margin-top:0">❌ 不需要 Python / Java / Node</h4><p style="margin:0;font-size:13.5px">原生二进制，无解释器。</p></div>
+    <div class="card tight"><h4 style="margin-top:0">❌ 不需要联网</h4><p style="margin:0;font-size:13.5px">全程离线可用，不发起任何网络请求。</p></div>
+    <div class="card tight"><h4 style="margin-top:0">❌ 不需要安装 / 管理员权限</h4><p style="margin:0;font-size:13.5px">标准用户双击即用，核心功能全部可用。</p></div>
+  </div>
+
+  <div class="note warn">
+    <p><b>关于「标准用户权限能否关机」：</b>可以。Windows 默认给 <code>Users</code> 组授予「关闭系统」（<code>SeShutdownPrivilege</code>）权限，所以本机关机、重启、注销、睡眠、休眠都不需要提权。只有<strong>创建系统计划任务</strong>和<strong>远程关机</strong>才需要管理员权限。</p>
+  </div>
+</section>
+
+<!-- ===== 6 ===== -->
+<section id="s6">
+  <h2><span class="num">6</span>便携性保证措施</h2>
+  <p class="lede">便携不是一个口号，是一组必须逐条落实的工程约束。</p>
+
+  <h3>6.1 路径解析：一切以 exe 所在目录为基准</h3>
+  <p>这是便携化最基础也最容易被忽略的一条。从快捷方式、从命令行、从「以管理员身份运行」启动时，<strong>当前工作目录（CWD）都可能不是 exe 所在目录</strong>。所以：</p>
+  <pre><code><span class="c">// ✅ 正确：取 exe 自身的完整路径，取其目录作为基准</span>
+<span class="k">wchar_t</span> exePath[MAX_PATH];
+GetModuleFileNameW(<span class="k">nullptr</span>, exePath, MAX_PATH);
+<span class="k">wchar_t</span>* lastSlash = wcsrchr(exePath, L<span class="s">'\\'</span>);
+<span class="k">if</span> (lastSlash) *(lastSlash + <span class="n">1</span>) = L<span class="s">'\0'</span>;   <span class="c">// 得到 "E:\Tools\PlanPower\"</span>
+
+<span class="c">// ❌ 错误：CWD 不可靠，可能是 C:\Windows\System32</span>
+<span class="c">// GetCurrentDirectoryW(MAX_PATH, buf);</span></code></pre>
+  <p>所有配置文件、日志、模板路径一律由这个基准目录拼接得出，<strong>绝不使用相对路径直接访问文件</strong>。</p>
+
+  <h3>6.2 存储位置决策树</h3>
+  <p>程序启动时按以下顺序决定配置写到哪，并把结果显示在界面状态栏上（用户随时知道自己的数据在哪）：</p>
+  <div class="diagram">
+  <svg viewBox="0 0 1000 340" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:780px;">
+    <defs>
+      <marker id="ar2" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+        <path d="M0,0 L9,4.5 L0,9 z" fill="#94a3b8"/>
+      </marker>
+    </defs>
+
+    <rect x="360" y="10" width="280" height="42" rx="9" fill="#eff4ff" stroke="#bfdbfe"/>
+    <text x="500" y="36" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#1e3a8a">程序启动</text>
+
+    <line x1="500" y1="52" x2="500" y2="76" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar2)"/>
+
+    <rect x="330" y="78" width="340" height="42" rx="9" fill="#fff8ec" stroke="#fde68a"/>
+    <text x="500" y="104" text-anchor="middle" font-family="sans-serif" font-size="12.5" fill="#92400e">命令行含 /portable，或存在 portable.flag？</text>
+
+    <line x1="500" y1="120" x2="500" y2="142" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar2)"/>
+    <text x="512" y="137" font-family="sans-serif" font-size="11.5" fill="#0d9488">是</text>
+
+    <rect x="360" y="144" width="280" height="42" rx="9" fill="#effaf8" stroke="#99f6e4"/>
+    <text x="500" y="170" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#0f766e">→ 强制写入 exe 同目录</text>
+
+    <line x1="500" y1="186" x2="500" y2="208" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar2)"/>
+    <text x="512" y="203" font-family="sans-serif" font-size="11.5" fill="#6b7280">否</text>
+
+    <rect x="330" y="210" width="340" height="42" rx="9" fill="#fff"/>
+    <rect x="330" y="210" width="340" height="42" rx="9" fill="none" stroke="#e5e7eb"/>
+    <text x="500" y="229" text-anchor="middle" font-family="sans-serif" font-size="12.5" fill="#374151">exe 同目录可写？（尝试创建临时文件）</text>
+    <text x="500" y="245" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#8b95a5">Program Files / 只读 U 盘 / 光盘 → 不可写</text>
+
+    <line x1="330" y1="231" x2="180" y2="231" stroke="#94a3b8" stroke-width="1.4"/>
+    <line x1="180" y1="231" x2="180" y2="262" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar2)"/>
+    <text x="212" y="225" font-family="sans-serif" font-size="11.5" fill="#0d9488">可写</text>
+
+    <line x1="670" y1="231" x2="820" y2="231" stroke="#94a3b8" stroke-width="1.4"/>
+    <line x1="820" y1="231" x2="820" y2="262" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar2)"/>
+    <text x="742" y="225" font-family="sans-serif" font-size="11.5" fill="#b45309">不可写</text>
+
+    <rect x="50" y="264" width="260" height="56" rx="9" fill="#effaf8" stroke="#99f6e4"/>
+    <text x="180" y="286" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="600" fill="#0f766e">写入 exe 同目录（默认）</text>
+    <text x="180" y="305" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#0d9488">真正的便携模式，随盘走</text>
+
+    <rect x="690" y="264" width="260" height="56" rx="9" fill="#fff8ec" stroke="#fde68a"/>
+    <text x="820" y="286" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="600" fill="#92400e">降级到 %LOCALAPPDATA%\PlanPower\</text>
+    <text x="820" y="305" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#b45309">并在状态栏标注「非便携模式」</text>
+  </svg>
+  </div>
+
+  <h3>6.3 便携性工程约束清单</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>#</th><th>约束</th><th>具体做法</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>单文件发布</strong></td><td>图标、字符串表、任务模板、UI 资源全部编入 <code>.rc</code>；运行时零外部文件读取</td></tr>
+      <tr><td>2</td><td><strong>路径基准</strong></td><td>统一由 <code>GetModuleFileNameW</code> 推导，禁用 CWD</td></tr>
+      <tr><td>3</td><td><strong>不写注册表</strong></td><td>默认配置下对注册表<strong>只读</strong>（仅读取系统信息，不写入）。「开机自启」用启动文件夹而非 <code>HKCU\Run</code></td></tr>
+      <tr><td>4</td><td><strong>不写系统目录</strong></td><td>不触碰 <code>Program Files</code>、<code>System32</code>、<code>Windows</code> 目录</td></tr>
+      <tr><td>5</td><td><strong>盘符漂移免疫</strong></td><td>绝不持久化绝对路径。任务内引用的外部程序一律存相对路径，运行时基于 exe 目录解析</td></tr>
+      <tr><td>6</td><td><strong>只读介质降级</strong></td><td>启动时探测可写性；不可写则全部配置仅存内存，退出时提示「本次改动未保存」</td></tr>
+      <tr><td>7</td><td><strong>多实例隔离</strong></td><td>命名互斥体 <code>Local\PlanPower_&lt;exe目录哈希&gt;</code>——按目录隔离，U 盘在不同机器上可各跑各的，不互相干扰</td></tr>
+      <tr><td>8</td><td><strong>系统任务可清理</strong></td><td>提供「清理全部系统任务」按钮；可勾选「退出时自动清理」实现零残留</td></tr>
+      <tr><td>9</td><td><strong>日志可关闭</strong></td><td>默认写日志，可关闭或限制大小——U 盘闪存有写入寿命，长时间运行需谨慎</td></tr>
+      <tr><td>10</td><td><strong>可移动介质感知</strong></td><td>用 <code>GetDriveTypeW</code> 检测运行目录是否为 <code>DRIVE_REMOVABLE</code>；若是，则关键操作（创建任务、修改设置）立即落盘而非延迟写入</td></tr>
+      <tr><td>11</td><td><strong>拔出容错</strong></td><td>可移动介质上运行时，所有文件操作包在异常处理里；写入失败不崩溃，转为内存态并提示</td></tr>
+      <tr><td>12</td><td><strong>无自更新</strong></td><td>不下载、不替换自身文件（只读介质无法替换）</td></tr>
+      <tr><td>13</td><td><strong>首次运行引导</strong></td><td>无配置文件时展示欢迎页与模板，而非空白界面</td></tr>
+      <tr><td>14</td><td><strong>存储位置可见</strong></td><td>状态栏常驻显示当前实际存储路径，用户随时可确认数据在哪</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note ok">
+    <p><b>一句话总结便携性设计：</b>程序把自己的位置当作唯一的世界中心，除此之外不往任何地方写东西。拔掉盘，这台机器上除了（可选的）几个计划任务之外，什么都没有留下。</p>
+  </div>
+</section>
+
+<!-- ===== 7 ===== -->
+<section id="s7">
+  <h2><span class="num">7</span>零依赖保证措施</h2>
+  <p class="lede">零依赖不能靠自觉，要靠编译配置 + 白名单 + 构建期自动校验三重保障。</p>
+
+  <h3>7.1 编译期措施</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>措施</th><th>做法</th><th>解决的问题</th></tr></thead>
+    <tbody>
+      <tr><td><strong>静态链接 CRT</strong></td><td><code>/MT</code>（Release 与 Debug 都要，且与所有 <code>.lib</code> 一致）</td><td>消除 <code>vcruntime140.dll</code> / <code>msvcp140.dll</code> 依赖——这是 C++ 便携版最常见的翻车点</td></tr>
+      <tr><td><strong>不使用 MFC / ATL</strong></td><td>直接用 Win32 API，不用 <code>afxwin.h</code> / <code>atlbase.h</code></td><td>避免引入 MFC 相关 DLL</td></tr>
+      <tr><td><strong>零第三方库</strong></td><td>不链接任何非系统 <code>.lib</code>；连 header-only 库也不用（自己写约 300 行 INI/JSON 处理）</td><td>避免隐藏的传递依赖</td></tr>
+      <tr><td><strong>内嵌 manifest</strong></td><td><code>/MANIFEST:EMBED</code> 写入 Common Controls 6.0、DPI 感知、<code>asInvoker</code> 执行级别</td><td>无需外置 <code>.manifest</code> 文件；同时解决界面视觉样式与 DPI 模糊</td></tr>
+      <tr><td><strong>安全与体积优化</strong></td><td><code>/O2 /GL /LTCG /OPT:REF /OPT:ICF</code> + <code>/DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA</code></td><td>减小体积的同时保留 ASLR / DEP 加固</td></tr>
+      <tr><td><strong>不使用 UPX 压缩</strong></td><td>即使能进一步缩小体积也<strong>不压缩</strong></td><td>UPX 加壳是杀软启发式误报的高危特征，得不偿失</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>7.2 运行时依赖白名单</h3>
+  <p>下面是允许出现的全部 DLL。它们都是 Windows 安装完成后默认存在、无法卸载的核心组件：</p>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>DLL</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>kernel32.dll</code></td><td>文件、内存、线程、互斥体、INI 配置读写</td></tr>
+      <tr><td><code>user32.dll</code></td><td>窗口、消息循环、输入、电源广播消息</td></tr>
+      <tr><td><code>gdi32.dll</code></td><td>界面绘制（列表、按钮、图标）</td></tr>
+      <tr><td><code>advapi32.dll</code></td><td>特权调整、关机 API、注册表只读访问</td></tr>
+      <tr><td><code>shell32.dll</code></td><td>托盘图标、<code>ShellExecuteEx</code>、文件图标</td></tr>
+      <tr><td><code>comctl32.dll</code></td><td>列表控件、状态栏、进度条、任务对话框</td></tr>
+      <tr><td><code>ole32.dll</code> / <code>oleaut32.dll</code></td><td>COM 基础设施（供任务计划程序接口使用）</td></tr>
+      <tr><td><code>powrprof.dll</code></td><td>睡眠 / 休眠电源状态切换</td></tr>
+      <tr><td><code>shlwapi.dll</code></td><td>路径与字符串处理工具</td></tr>
+      <tr><td><code>ntdll.dll</code></td><td>所有 Windows 进程的隐式依赖，无法也不需避免</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note warn">
+    <p><b>白名单之外的任何 DLL 都视为缺陷。</b>常见违规：<code>vcruntime140.dll</code>、<code>msvcp140.dll</code>（CRT 没静态链接）、<code>mfc140.dll</code>（用了 MFC）、<code>api-ms-win-*</code> 系列（通常无害，是 API Set 转发层，但需确认）、任何 vendor 目录下的 DLL。</p>
+  </div>
+
+  <h3>7.3 构建期自动校验</h3>
+  <p>把依赖检查写进构建脚本，每次出包自动跑，防止改代码时不小心引入新依赖：</p>
+  <pre><code><span class="c">:: 检查导入表，输出应只含白名单内的 DLL</span>
+dumpbin /dependents PlanPower.exe
+
+<span class="c">:: 校验通过示例（x86 Release）</span>
+<span class="c">::   KERNEL32.dll</span>
+<span class="c">::   USER32.dll</span>
+<span class="c">::   GDI32.dll</span>
+<span class="c">::   ADVAPI32.dll</span>
+<span class="c">::   SHELL32.dll</span>
+<span class="c">::   COMCTL32.dll</span>
+<span class="c">::   ole32.dll</span>
+<span class="c">::   POWRPROF.dll</span>
+<span class="c">::   SHLWAPI.dll</span>
+<span class="c">::   ntdll.dll</span>
+
+<span class="c">:: 体积检查</span>
+<span class="k">for</span> %%F <span class="k">in</span> (PlanPower.exe) <span class="k">do</span> @echo %%~zF bytes   <span class="c">:: 期望 &lt; 512000</span></code></pre>
+
+  <h3>7.4 向下兼容策略</h3>
+  <p>若需要兼容 Windows 7 / 8.1，需遵守两条约束：</p>
+  <ul>
+    <li>只调用 Win7 时代就存在的 API。涉及 <code>SetThreadDpiAwarenessContext</code>、<code>GetDpiForWindow</code> 等 Win10 新增函数时，用 <code>GetProcAddress</code> <strong>动态加载</strong>并做存在性判断，而不是静态导入——静态导入会让程序在旧系统上直接启动失败。</li>
+    <li>manifest 中的 <code>&lt;dpiAwareness&gt;</code> 用旧写法，或同时声明新旧两套。</li>
+  </ul>
+  <p>如果不打算兼容 Win7，可以把系统要求直接定为 Windows 10 1607+，代码可以简单不少。</p>
+
+  <h3>7.5 关于提权：唯一不可避免的子进程</h3>
+  <div class="note warn">
+    <p>「零子进程」是本方案的默认状态，但有一个例外：<strong>UAC 提权在 Windows 机制上必须通过启动新进程实现</strong>，无法绕过。使用 <code>ShellExecuteEx</code> + <code>runas</code> 动词时，会由系统拉起一个提权后的新实例。</p>
+    <p>这不影响零依赖结论——提权后的实例<strong>就是同一个 exe 自己</strong>，不涉及任何外部程序。而且这条路径只在用户主动开启「注册系统任务」功能时才会走到。</p>
+  </div>
+</section>
+
+<!-- ===== 8 ===== -->
+<section id="s8">
+  <h2><span class="num">8</span>核心 API 映射：用系统调用替代外部命令</h2>
+  <p class="lede">Revision 1 大量调用 <code>shutdown.exe</code>、<code>rundll32.exe</code>、<code>schtasks.exe</code>。便携版改为直接调用系统 API，好处有三：不 spawn 子进程、不依赖 System32 下 exe 是否存在、大幅降低杀软启发式误报。</p>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>功能</th><th>Revision 1（调外部命令）</th><th>Revision 2（直调 API）</th><th>所在 DLL</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>关机 / 重启</strong></td>
+        <td><code>shutdown.exe /s /r /t /c /f</code></td>
+        <td><code>InitiateSystemShutdownExW(NULL, msg, timeout, force, reboot, reason)</code></td>
+        <td>advapi32</td>
+      </tr>
+      <tr>
+        <td><strong>取消已排期的关机</strong></td>
+        <td><code>shutdown.exe /a</code></td>
+        <td><code>AbortSystemShutdownW(NULL)</code></td>
+        <td>advapi32</td>
+      </tr>
+      <tr>
+        <td><strong>注销</strong></td>
+        <td><code>shutdown.exe /l</code></td>
+        <td><code>ExitWindowsEx(EWX_LOGOFF, SHTDN_REASON_MAJOR_APPLICATION)</code></td>
+        <td>user32</td>
+      </tr>
+      <tr>
+        <td><strong>休眠</strong></td>
+        <td><code>shutdown.exe /h</code></td>
+        <td><code>SetSuspendState(TRUE, FALSE, FALSE)</code></td>
+        <td>powrprof</td>
+      </tr>
+      <tr>
+        <td><strong>睡眠</strong></td>
+        <td><code>rundll32 powrprof.dll,SetSuspendState</code></td>
+        <td><code>SetSuspendState(FALSE, FALSE, FALSE)</code>；需真睡眠时用 <code>NtSetSystemPowerState(PowerActionSleep, ...)</code></td>
+        <td>powrprof / ntdll</td>
+      </tr>
+      <tr>
+        <td><strong>锁定工作站</strong></td>
+        <td><code>rundll32 user32.dll,LockWorkStation</code></td>
+        <td><code>LockWorkStation()</code></td>
+        <td>user32</td>
+      </tr>
+      <tr>
+        <td><strong>关闭显示器</strong></td>
+        <td>—</td>
+        <td><code>SendMessageTimeout(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER, 2, ...)</code></td>
+        <td>user32</td>
+      </tr>
+      <tr>
+        <td><strong>提升关机特权</strong></td>
+        <td>—</td>
+        <td><code>OpenProcessToken</code> + <code>LookupPrivilegeValue(SE_SHUTDOWN_NAME)</code> + <code>AdjustTokenPrivileges</code></td>
+        <td>advapi32</td>
+      </tr>
+      <tr>
+        <td><strong>创建 / 删除 / 启停计划任务</strong></td>
+        <td><code>schtasks.exe /create /delete /change</code></td>
+        <td><code>CoCreateInstance(CLSID_TaskScheduler, ..., IID_ITaskService, ...)</code>，走 COM 接口</td>
+        <td>ole32 + 系统注册的 COM 服务器</td>
+      </tr>
+      <tr>
+        <td><strong>枚举计划任务</strong></td>
+        <td><code>schtasks /query /fo csv /v</code>（表头随语言变化，脆弱）</td>
+        <td><code>ITaskService::GetFolder</code> + <code>IEnumWorkItems</code>，返回结构化对象</td>
+        <td>同上</td>
+      </tr>
+      <tr>
+        <td><strong>提权</strong></td>
+        <td><code>ShellExecute(runas)</code></td>
+        <td><code>ShellExecuteExW</code> + <code>runas</code> 动词</td>
+        <td>shell32</td>
+      </tr>
+      <tr>
+        <td><strong>防止执行期间睡眠</strong></td>
+        <td>—</td>
+        <td><code>SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)</code></td>
+        <td>kernel32</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>8.1 关机：<code>InitiateSystemShutdownExW</code> 的两个额外好处</h3>
+  <pre><code><span class="c">// 1) 先提升关机特权（标准用户默认拥有 SeShutdownPrivilege，这里只是确保生效）</span>
+HANDLE hToken;
+OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &amp;hToken);
+TOKEN_PRIVILEGES tp = {};
+tp.PrivilegeCount = <span class="n">1</span>;
+LookupPrivilegeValueW(<span class="k">nullptr</span>, SE_SHUTDOWN_NAME, &amp;tp.Privileges[<span class="n">0</span>].Luid);
+tp.Privileges[<span class="n">0</span>].Attributes = SE_PRIVILEGE_ENABLED;
+AdjustTokenPrivileges(hToken, FALSE, &amp;tp, <span class="n">0</span>, <span class="k">nullptr</span>, <span class="k">nullptr</span>);
+CloseHandle(hToken);
+
+<span class="c">// 2) 发起关机：超时 60 秒，系统会弹出带倒计时的官方提示框</span>
+InitiateSystemShutdownExW(
+    <span class="k">nullptr</span>,                              <span class="c">// 本机</span>
+    L<span class="s">"系统将在 60 秒后关机，请保存工作"</span>,      <span class="c">// 提示文本（最长 512 字符）</span>
+    <span class="n">60</span>,                                 <span class="c">// 倒计时秒数</span>
+    FALSE,                              <span class="c">// 是否强制关闭应用（FALSE = 优雅）</span>
+    FALSE,                              <span class="c">// 关机后是否重启</span>
+    SHTDN_REASON_MAJOR_APPLICATION | SHTDN_REASON_FLAG_PLANNED);</code></pre>
+
+  <div class="note ok">
+    <p><b>两个关键收益：</b></p>
+    <p>① <strong>系统自带倒计时提示框。</strong>调用后 Windows 会弹出官方的关机倒计时窗口并显示自定义文本。这意味着<strong>即使 PlanPower 完全没在运行，用户也依然能看到提示并有机会取消</strong>（通过界面按钮或 <code>AbortSystemShutdownW</code>）。这正好补上了 Revision 1 里「主程序没运行就没有提醒」的短板。</p>
+    <p>② <strong>零子进程。</strong>不启动 <code>shutdown.exe</code>，因此不受组策略禁用该 exe 的影响，也不会因为「频繁启动系统关机程序」而触发杀软的启发式规则。</p>
+  </div>
+
+  <h3>8.2 一个必须讲清楚的架构约束</h3>
+  <div class="note warn">
+    <p><b>系统计划任务的动作只能是「启动一个 exe」</b>——这是任务计划程序本身的机制，无法绕过。所以当用户启用「系统任务」功能时，注册进去的任务动作必须指向一个真实存在的可执行文件。</p>
+    <p>这里有个陷阱：如果指向 U 盘上的 <code>PlanPower.exe</code>，盘符一变任务就失效；而且 U 盘拔掉后任务彻底无法执行。</p>
+    <p><b>解决方案：</b>系统任务的动作指向 <code>%SystemRoot%\System32\shutdown.exe</code>——系统绝对路径、永不变化、任何 Windows 都有。PlanPower 只负责<strong>注册和管理</strong>这些任务，不参与执行。</p>
+    <p>这样带来三个好处：任务不依赖 PlanPower 存在；U 盘拔掉后任务照样按期执行；这也正是「任务跨重启存活」这一承诺的真实含义。</p>
+    <p><b>注意：</b>这不是 PlanPower 自己 spawn 的进程，而是由操作系统调度器调起的系统自带程序，不影响「零依赖」的结论——<code>shutdown.exe</code> 是 Windows 核心组件且路径固定。</p>
+  </div>
+</section>
+
+<!-- ===== 9 ===== -->
+<section id="s9">
+  <h2><span class="num">9</span>验收清单</h2>
+  <p class="lede">每一条都可以在虚拟机里实际验证。全部通过，才敢说「便携 + 零依赖」。</p>
+
+  <h3>9.1 零依赖验收</h3>
+  <ul class="chk">
+    <li><b>依赖表检查：</b><code>dumpbin /dependents PlanPower.exe</code> 的输出仅含 §7.2 白名单内的 DLL，无 <code>vcruntime140.dll</code>、无 <code>msvcp140.dll</code>、无任何第三方 DLL。</li>
+    <li><b>裸机运行：</b>在全新安装、未装任何运行库的 Windows 10 虚拟机上双击 exe，界面正常弹出，无「缺少 xxx.dll」报错。</li>
+    <li><b>无控制台窗口：</b>双击运行时没有黑色命令行窗口闪现。</li>
+    <li><b>体积达标：</b>单文件体积小于 512 KB。</li>
+    <li><b>冷启动速度：</b>从双击到界面可见，耗时小于 100 ms。</li>
+    <li><b>无子进程：</b>程序运行期间，在任务管理器中展开其进程树，<strong>没有子进程</strong>（提权场景除外）。</li>
+  </ul>
+
+  <h3>9.2 便携性验收</h3>
+  <ul class="chk">
+    <li><b>U 盘漫游：</b>复制到 U 盘，在机器 A 上创建 3 条任务并退出；把 U 盘插到机器 B（盘符不同），程序能正常读取全部任务与设置。</li>
+    <li><b>只读介质：</b>把程序目录设为只读（或使用带写保护开关的 U 盘），程序仍能启动并正常工作，配置改动仅存内存，退出时给出明确提示。</li>
+    <li><b>Program Files 场景：</b>把 exe 放进 <code>C:\Program Files\</code>（无写权限），程序自动降级到 <code>%LOCALAPPDATA%\PlanPower\</code> 并在状态栏标注「非便携模式」。</li>
+    <li><b>路径独立性：</b>从「以管理员身份运行」启动（此时 CWD 为 <code>System32</code>），配置文件仍正确写在 exe 同目录，而非 System32。</li>
+    <li><b>零注册表：</b>用 Process Monitor 全程监控，除读取外<strong>无任何注册表写入</strong>（筛选 <code>RegSetValue</code> 结果为空）。</li>
+    <li><b>零系统目录写入：</b>Process Monitor 中无对 <code>Program Files</code> / <code>Windows</code> / <code>System32</code> 的写操作。</li>
+    <li><b>可移动介质识别：</b>在 U 盘上运行时，状态栏正确显示「可移动介质」标识，关键配置实时落盘。</li>
+    <li><b>拔出容错：</b>运行中强制拔出 U 盘，程序不出现未捕获异常弹窗，优雅降级或正常退出。</li>
+    <li><b>多实例隔离：</b>同一台机器上从两个不同目录运行两份 PlanPower，互不干扰，各自管理自己的任务。</li>
+    <li><b>卸载零残留：</b>未启用系统任务时，删除 exe 与配置文件后，机器上无任何残留（注册表、临时目录、缓存均为空）。</li>
+    <li><b>系统任务清理：</b>启用系统任务后，点击「清理全部系统任务」，任务计划程序中 <code>\PlanPower</code> 文件夹被完全移除。</li>
+  </ul>
+
+  <h3>9.3 功能回归（便携版必须仍然可用）</h3>
+  <ul class="chk">
+    <li>关机、重启、睡眠、休眠、注销、锁定、关屏七个动作全部可用（标准用户权限下）。</li>
+    <li>倒计时任务准确触发；执行前提醒窗口正常弹出，「取消本次」能真正阻止关机。</li>
+    <li>主程序未运行时，系统级任务的倒计时提示仍由 Windows 弹出，用户仍可取消。</li>
+    <li>托盘菜单、悬浮窗、三步向导、导入导出全部功能正常。</li>
+    <li>中文路径与用户名（含空格、非 ASCII 字符）下一切正常。</li>
+  </ul>
+</section>
+
+<!-- ===== 10 ===== -->
+<section id="s10">
+  <h2><span class="num">10</span>已知限制与风险</h2>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>#</th><th>限制 / 风险</th><th>性质</th><th>应对</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><strong>系统计划任务的动作必须调用外部 exe</strong>（<code>shutdown.exe</code>）</td>
+        <td>OS 机制限制，无法规避</td>
+        <td>指向 <code>%SystemRoot%\System32\shutdown.exe</code> 这个固定系统路径；不影响零依赖结论</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><strong>UAC 提权必须启动新进程</strong></td>
+        <td>OS 机制限制</td>
+        <td>仅「注册系统任务」这一可选功能会触发；启动的是自身 exe，不涉及外部程序</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><strong>杀软启发式误报</strong>：小体积未签名 exe + 调用关机 API</td>
+        <td>外部环境风险</td>
+        <td>不用 UPX 加壳、不联网、不写系统目录、不创建计划任务（除非用户主动开启）；有条件时做代码签名</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><strong>便携版无法自更新</strong></td>
+        <td>设计取舍</td>
+        <td>只读介质无法替换自身文件；改为在「关于」页显示版本与手动下载入口</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><strong>系统任务会留在宿主机器上</strong></td>
+        <td>设计取舍</td>
+        <td>默认关闭该功能；开启时明确告知；提供「退出时自动清理」实现零残留</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td><strong>组策略禁用关机 API / 权限被收紧</strong>（企业环境）</td>
+        <td>环境限制</td>
+        <td>启动时探测可用通道并自动降级（<code>InitiateSystemShutdownExW</code> → <code>ExitWindowsEx</code>），无法执行时给出明确原因而非静默失败</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td><strong>U 盘闪存写入寿命</strong></td>
+        <td>硬件特性</td>
+        <td>日志默认限制大小并可关闭；配置仅在变更时写入，不做周期性落盘</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td><strong>UI 开发成本显著高于 WPF 方案</strong></td>
+        <td>工程成本</td>
+        <td>界面结构本身不复杂（列表 + 向导 + 悬浮窗 + 托盘）；业务逻辑层与界面层严格分离，未来若要改回托管方案可复用</td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td><strong>无管理员权限时无法注册系统任务</strong></td>
+        <td>权限限制</td>
+        <td>界面上清晰区分「内存任务」与「系统任务」，并说明后者需要提权</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <p><b>总体评价：</b>这次修订用「UI 开发成本」换来了「依赖纯度的确定性」。对于一个主打「复制即用、不挑机器」的便携工具来说，这个交换是划算的——用户不会关心你的界面是 XAML 还是 GDI 画的，但一定会因为「缺少 vcruntime140.dll」而放弃使用。</p>
+  </div>
+</section>
+
+<footer>
+  <p><b>PlanPower · 便携版与零依赖专项设计（Revision 2）</b>　|　生成日期 2026-10-12</p>
+  <p>本文档需与《PlanPower 设计方案（Revision 1）》配合阅读：第 1–4 章（产品定位、竞品调研、功能建议、功能清单）、第 6 章（界面设计）、第 7 章（技术坑清单）、第 8 章（里程碑）仍然有效；第 5.1 节的技术选型以本文为准。</p>
+</footer>
+
+</div>
+</body>
+</html>

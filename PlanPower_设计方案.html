@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlanPower · Windows 定时电源管理器 设计方案</title>
+<style>
+  :root{
+    --bg:#f5f6f8;
+    --card:#ffffff;
+    --ink:#1f2937;
+    --ink-2:#4b5563;
+    --ink-3:#6b7280;
+    --line:#e5e7eb;
+    --line-2:#eef0f3;
+    --brand:#2563eb;
+    --brand-soft:#eff4ff;
+    --teal:#0d9488;
+    --teal-soft:#effaf8;
+    --amber:#b45309;
+    --amber-soft:#fff8ec;
+    --red:#b91c1c;
+    --red-soft:#fef2f2;
+    --violet:#6d28d9;
+    --violet-soft:#f5f3ff;
+    --radius:10px;
+    --mono:"SF Mono",Menlo,Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 80px;}
+
+  /* ---------- Hero ---------- */
+  .hero{
+    background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 55%,#0d9488 100%);
+    color:#fff;padding:56px 24px 48px;margin-bottom:36px;
+  }
+  .hero-inner{max-width:1080px;margin:0 auto;}
+  .hero .tag{
+    display:inline-block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);
+    padding:5px 12px;border-radius:999px;margin-bottom:18px;
+  }
+  .hero h1{margin:0 0 10px;font-size:34px;line-height:1.3;font-weight:700;letter-spacing:-.01em;}
+  .hero p.sub{margin:0;font-size:16px;color:rgba(255,255,255,.88);max-width:760px;}
+  .hero .meta{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px;}
+  .hero .meta span{
+    font-size:12.5px;background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.22);border-radius:6px;padding:5px 11px;
+  }
+
+  /* ---------- Section ---------- */
+  section{margin-bottom:44px;}
+  h2{
+    font-size:22px;margin:0 0 6px;font-weight:700;letter-spacing:-.01em;
+    display:flex;align-items:center;gap:10px;
+  }
+  h2 .num{
+    flex:none;width:30px;height:30px;border-radius:8px;background:var(--brand);color:#fff;
+    font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  }
+  h2 + .lede{color:var(--ink-3);font-size:14px;margin:0 0 20px 40px;}
+  h3{font-size:16.5px;margin:28px 0 10px;font-weight:650;}
+  h4{font-size:14.5px;margin:20px 0 8px;font-weight:650;color:var(--ink-2);}
+  p{margin:0 0 12px;}
+  ul,ol{margin:0 0 14px;padding-left:22px;}
+  li{margin-bottom:5px;}
+  code{
+    font-family:var(--mono);font-size:12.5px;background:#eef2f7;color:#1e3a8a;
+    padding:1.5px 6px;border-radius:4px;white-space:nowrap;
+  }
+  pre{
+    background:#0f172a;color:#e2e8f0;border-radius:var(--radius);
+    padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;
+    line-height:1.65;margin:0 0 16px;
+  }
+  pre code{background:none;color:inherit;padding:0;white-space:pre;}
+  pre .c{color:#7c8ba1;}
+  pre .k{color:#7dd3fc;}
+  pre .s{color:#a5e8b5;}
+  pre .t{color:#fca5a5;}
+
+  /* ---------- Card ---------- */
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 24px;margin-bottom:16px;
+  }
+  .card.tight{padding:16px 18px;}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  @media(max-width:820px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+  /* ---------- Table ---------- */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:#fff;margin-bottom:18px;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{
+    text-align:left;background:#f8fafc;color:var(--ink-2);font-weight:650;
+    padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:13px;
+  }
+  td{padding:11px 14px;border-bottom:1px solid var(--line-2);vertical-align:top;color:var(--ink-2);}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#fafbfc;}
+  td strong{color:var(--ink);font-weight:600;}
+  td code{white-space:normal;}
+
+  /* ---------- Badges ---------- */
+  .b{display:inline-block;font-size:11.5px;font-weight:650;padding:2px 8px;border-radius:5px;white-space:nowrap;}
+  .b-p0{background:var(--red-soft);color:var(--red);border:1px solid #fecaca;}
+  .b-p1{background:var(--amber-soft);color:var(--amber);border:1px solid #fde68a;}
+  .b-p2{background:var(--brand-soft);color:var(--brand);border:1px solid #bfdbfe;}
+  .b-new{background:var(--teal-soft);color:var(--teal);border:1px solid #99f6e4;}
+  .b-tag{background:#f1f5f9;color:var(--ink-3);border:1px solid var(--line);}
+
+  /* ---------- Callout ---------- */
+  .note{
+    border-left:3px solid var(--brand);background:var(--brand-soft);
+    border-radius:0 var(--radius) var(--radius) 0;padding:13px 18px;margin:0 0 16px;font-size:14px;
+  }
+  .note.warn{border-left-color:#f59e0b;background:var(--amber-soft);}
+  .note.danger{border-left-color:#dc2626;background:var(--red-soft);}
+  .note.ok{border-left-color:var(--teal);background:var(--teal-soft);}
+  .note b{color:var(--ink);}
+  .note p:last-child{margin-bottom:0;}
+
+  /* ---------- Feature list ---------- */
+  .feat{
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:15px 17px;margin-bottom:11px;
+  }
+  .feat .h{display:flex;align-items:center;gap:9px;margin-bottom:6px;flex-wrap:wrap;}
+  .feat .h .name{font-weight:650;font-size:14.5px;}
+  .feat .row{font-size:13.5px;color:var(--ink-2);margin:0 0 4px;}
+  .feat .row b{color:var(--ink);font-weight:600;}
+
+  /* ---------- KPI strip ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px;}
+  @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr);}}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;}
+  .kpi .v{font-size:22px;font-weight:700;color:var(--brand);letter-spacing:-.02em;}
+  .kpi .l{font-size:12.5px;color:var(--ink-3);margin-top:2px;}
+
+  /* ---------- TOC ---------- */
+  .toc{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px 22px;margin-bottom:36px;}
+  .toc h4{margin:0 0 10px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);}
+  .toc ol{margin:0;padding-left:0;list-style:none;counter-reset:t;
+    display:grid;grid-template-columns:1fr 1fr;gap:4px 26px;}
+  @media(max-width:820px){.toc ol{grid-template-columns:1fr;}}
+  .toc li{counter-increment:t;font-size:14px;margin:0;padding:3px 0;}
+  .toc li::before{content:counter(t) ". ";color:var(--brand);font-weight:650;}
+  .toc a{color:var(--ink);text-decoration:none;border-bottom:1px solid transparent;}
+  .toc a:hover{border-bottom-color:var(--brand);color:var(--brand);}
+
+  /* ---------- Architecture diagram ---------- */
+  .diagram{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:18px;overflow-x:auto;}
+
+  footer{
+    border-top:1px solid var(--line);padding-top:22px;margin-top:44px;
+    font-size:13px;color:var(--ink-3);
+  }
+  .src{font-size:12.5px;color:var(--ink-3);}
+  .src a{color:var(--brand);text-decoration:none;word-break:break-all;}
+  .src a:hover{text-decoration:underline;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-inner">
+    <span class="tag">Windows 10 · 桌面软件设计方案</span>
+    <h1>PlanPower — 定时电源管理器</h1>
+    <p class="sub">一款面向 Windows 10 的轻量级计划任务工具：统一管理定时关机、重启、睡眠、休眠、锁定等电源动作。优先复用系统自带组件，不引入任何第三方运行库，单文件即可运行。</p>
+    <div class="meta">
+      <span>目标系统 Windows 10 1903+ / 11</span>
+      <span>推荐栈 C# + WPF + .NET Framework 4.8（系统内置）</span>
+      <span>零第三方依赖</span>
+      <span>双引擎调度</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<div class="note danger" style="margin-bottom:28px">
+  <p><b>⚠ 本文档为 Revision 1，技术选型已被修订。</b>因追加「免安装便携版 + 零依赖」需求，第 5.1 节的 <b>C# + WPF + .NET Framework 4.8</b> 方案不再适用——.NET Framework 属于 Windows 的可选功能，可被禁用，且在部分 Win10 版本上并未预装。</p>
+  <p>修订后的技术栈为 <b>C++17 + Win32 API + 静态链接 CRT（/MT）</b>，实现真正的单文件零依赖。功能设计、界面设计、竞品调研、技术坑清单（第 1–4、6–8 章）<b>仍然全部有效</b>，请配合《PlanPower 便携版与零依赖专项设计》一并阅读。</p>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="v">0</div><div class="l">第三方运行库 / NuGet 依赖</div></div>
+  <div class="kpi"><div class="v">&lt;1 MB</div><div class="l">发布体积（.NET Framework 单 exe）</div></div>
+  <div class="kpi"><div class="v">2</div><div class="l">调度引擎（内存计时 + 系统计划任务）</div></div>
+  <div class="kpi"><div class="v">7</div><div class="l">支持的电源动作</div></div>
+</div>
+
+<div class="toc">
+  <h4>目录</h4>
+  <ol>
+    <li><a href="#s1">产品定位与设计原则</a></li>
+    <li><a href="#s2">GitHub 同类开源项目调研</a></li>
+    <li><a href="#s3">可额外增加的功能建议（26 项）</a></li>
+    <li><a href="#s4">整体功能清单（分级）</a></li>
+    <li><a href="#s5">技术实现思路</a></li>
+    <li><a href="#s6">界面设计</a></li>
+    <li><a href="#s7">已知风险与技术坑</a></li>
+    <li><a href="#s8">里程碑与验收标准</a></li>
+  </ol>
+</div>
+
+<!-- ============ 1 ============ -->
+<section id="s1">
+  <h2><span class="num">1</span>产品定位与设计原则</h2>
+  <p class="lede">先说清楚这个软件「是什么」和「不做什么」。</p>
+
+  <div class="card">
+    <h3 style="margin-top:0">一句话定位</h3>
+    <p>把 Windows 自带任务计划程序的能力，包装成一个「看得懂、点得动、管得住」的电源任务管理中心。</p>
+
+    <h3>四条硬约束</h3>
+    <ul>
+      <li><strong>只依赖系统自带组件。</strong>不打包 Python、不要求 .NET 8/9/10 运行时、不引 NuGet 包。用户双击即用，卸载就是删文件。</li>
+      <li><strong>任务必须能跨重启存活。</strong>这是和绝大多数「倒计时关机小工具」最本质的区别——软件没开、电脑重启过、甚至处于休眠状态，任务照样生效。</li>
+      <li><strong>UI 一眼看懂。</strong>主界面只回答三个问题：有哪些任务？下次什么时候跑？现在是开还是关？</li>
+      <li><strong>危险操作必须可逆。</strong>任何会导致关机的动作，都要有提前提醒和一键取消。</li>
+    </ul>
+
+    <h3>不做什么（划清边界）</h3>
+    <ul>
+      <li>不做通用自动化平台（那是 zTasker 的地盘），只聚焦<strong>电源与系统状态类动作</strong>。</li>
+      <li>不做远程批量管理控制台（可选留一个 <code>shutdown /m</code> 的扩展点即可）。</li>
+      <li>不联网、不上报、不自动更新——降低杀软误报和隐私顾虑。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="s2">
+  <h2><span class="num">2</span>GitHub 同类开源项目调研</h2>
+  <p class="lede">以下是实际存在的开源/免费同类软件，作为功能取舍的参照系。</p>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr><th>项目</th><th>技术栈</th><th>核心能力</th><th>可借鉴点</th><th>它的短板</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>lukaslangrock<br>/ShutdownTimerClassic</strong></td>
+        <td>C# / WinForms<br>(.NET Framework)</td>
+        <td>单次倒计时执行关机 / 重启 / 休眠 / 睡眠 / 锁定；倒计时窗口置顶且随剩余时间变色；可最小化到后台</td>
+        <td>「强制关机」与「优雅关机」两种模式的区分；倒计时可视化</td>
+        <td>只有单一倒计时，无任务列表、无重复计划</td>
+      </tr>
+      <tr>
+        <td><strong>smilefate/Chronoff</strong></td>
+        <td>C# / WPF<br><span class="b b-tag">.NET 10</span></td>
+        <td>倒计时 / 指定时刻 / 重复计划；关机、重启、睡眠、休眠、锁定、注销；密码保护；托盘；19 种语言；深浅色主题</td>
+        <td>密码保护防篡改；重复计划；单实例互斥；托盘常驻</td>
+        <td>需额外安装 .NET 10 运行时，不符合「零依赖」诉求</td>
+      </tr>
+      <tr>
+        <td><strong>yingming006<br>/ShutdownTool</strong></td>
+        <td>C# 零依赖<br>(约 18 KB)</td>
+        <td>天 / 时 / 分三级倒计时；暂停与继续；结束前 55 秒弹窗提醒；托盘；单实例</td>
+        <td>极致体积；倒计时可暂停/继续；提前提醒的秒数设计</td>
+        <td>功能面窄，任务不可持久化</td>
+      </tr>
+      <tr>
+        <td><strong>athosAnd<br>/WinShutdownTool</strong></td>
+        <td>Python + Tkinter</td>
+        <td>延时关机、定时关机、可叠加的年/月/天延迟、最短/最长模式、剩余时间大字体提醒、可「生成系统计划」、可取消系统计划、免管理员权限</td>
+        <td><strong>「生成系统计划」</strong>——把任务交给系统托管后软件即可退出；时间叠加策略</td>
+        <td>依赖 Python 环境；UI 朴素</td>
+      </tr>
+      <tr>
+        <td><strong>bluehints<br>/scheduled-shutdown</strong></td>
+        <td>Python + PySide6<br>+ SQLite3</td>
+        <td>任务管理器形态，圆角卡片式界面，本地 SQLite 持久化多个任务</td>
+        <td>「任务列表 + 卡片」的信息架构；本地持久化多任务</td>
+        <td>依赖 Python 运行时</td>
+      </tr>
+      <tr>
+        <td><strong>zTasker</strong><br><span class="b b-tag">免费·非开源</span></td>
+        <td>原生</td>
+        <td>16 种触发条件（定时循环、空闲、CPU / GPU / 内存占用、网速、断网、文件夹监控、开机、唤醒恢复、热键）× 50 多种动作</td>
+        <td><strong>条件触发</strong>思路；动作矩阵的组合方式；全局热键</td>
+        <td>功能极重，学习成本高，与「简洁」目标冲突</td>
+      </tr>
+      <tr>
+        <td><strong>TRGLUL<br>/FluentTaskScheduler</strong></td>
+        <td>WinUI3<br>Fluent Design</td>
+        <td>为 Windows 任务计划程序重绘现代 Fluent 风格界面</td>
+        <td>「系统任务计划程序值得一个现代 UI」这一判断本身</td>
+        <td>WinUI3 需额外运行时；面向全类型任务，非电源场景</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note ok">
+    <p><b>调研结论：</b>这个赛道上的开源项目分成两派——一派是「轻量倒计时器」（ShutdownTimerClassic、ShutdownTool），体验好但任务不持久、不能重复；另一派是「系统计划任务的前端」（FluentTaskScheduler、WinShutdownTool 的「生成系统计划」），能持久但交互原始。</p>
+    <p><b>PlanPower 的机会点，就是把这两派合起来</b>：用系统计划任务做持久化的底座，用现代 UI 做交互层，并补齐两者都缺的「多任务并行管理 + 条件触发 + 唤醒执行」。</p>
+  </div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="s3">
+  <h2><span class="num">3</span>可额外增加的功能建议</h2>
+  <p class="lede">26 项，按「核心必备 / 高价值低成本 / 差异化进阶 / 锦上添花」四档排列。每项都标注了用途与价值。</p>
+
+  <h3>A. 核心必备（第一版就该有）</h3>
+
+  <div class="feat">
+    <div class="h"><span class="name">A1 · 提前提醒 + 一键取消窗口</span><span class="b b-p0">必备</span></div>
+    <p class="row"><b>用途：</b>任务执行前 N 秒（可配置，默认 60 秒）弹出置顶窗口，显示倒计时、「立即执行」和「取消本次」两个按钮。</p>
+    <p class="row"><b>价值：</b>这是防数据丢失的第一道闸门。同类软件里 ShutdownTimerClassic 用「强制/优雅」二分法规避风险，WinShutdownTool 用 55 秒弹窗，本质都是同一诉求。配合 <code>shutdown /a</code> 实现零成本取消。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">A2 · 任务持久化到系统计划任务</span><span class="b b-p0">必备</span></div>
+    <p class="row"><b>用途：</b>创建的长期/重复任务写入 Windows 任务计划程序的独立文件夹，软件关闭后仍生效。</p>
+    <p class="row"><b>价值：</b>解决「软件一关任务就没了」这个最大痛点，也让程序本体可以完全退出、不占内存、不需要开机自启。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">A3 · 唤醒执行（Wake To Run）</span><span class="b b-p0">必备</span><span class="b b-new">同类少见</span></div>
+    <p class="row"><b>用途：</b>允许任务在电脑处于<strong>睡眠 / 休眠</strong>状态时，通过主板 RTC 定时唤醒并执行。</p>
+    <p class="row"><b>价值：</b>任务计划程序的原生能力（<code>&lt;WakeToRun&gt;</code>），但绝大多数同类软件都没有暴露出来。这让「凌晨 3 点自动唤醒开机跑备份再关机」成为可能。软件内用 <code>powercfg /waketimers</code> 展示当前已注册的唤醒定时器，让用户能确认硬件是否真的会醒。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">A4 · 错过补跑（Start When Available）</span><span class="b b-p0">必备</span></div>
+    <p class="row"><b>用途：</b>如果计划时间点电脑恰好关机或休眠未唤醒，开机后自动补执行。</p>
+    <p class="row"><b>价值：</b>笔记本合盖、临时断电等场景下的兜底。默认开启，可在任务高级设置中关闭。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">A5 · 多任务并行列表</span><span class="b b-p0">必备</span></div>
+    <p class="row"><b>用途：</b>主界面以列表呈现全部任务，每行显示动作类型、计划规则、下次执行时间、启用状态。</p>
+    <p class="row"><b>价值：</b>这是与「单倒计时小工具」拉开差距的地方。用户可以同时挂「每天 23:00 关机」「工作日 08:30 唤醒」「30 分钟后睡眠」三条互不干扰的规则。</p>
+  </div>
+
+  <h3>B. 高价值低成本（强烈建议）</h3>
+
+  <div class="feat">
+    <div class="h"><span class="name">B1 · 空闲触发关机</span><span class="b b-p1">建议</span></div>
+    <p class="row"><b>用途：</b>当系统持续空闲（无键鼠输入、CPU 低负载）超过 N 分钟后执行关机或睡眠。</p>
+    <p class="row"><b>价值：</b>下载、渲染、编译这类「不知道还要多久」的场景，不用猜时间。zTasker 靠这个功能吸引了大量用户。实现上可直接用任务计划程序的 <code>ONIDLE</code> 触发器，零额外成本。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">B2 · 指定进程退出后关机</span><span class="b b-p1">建议</span><span class="b b-new">差异化</span></div>
+    <p class="row"><b>用途：</b>监听某个进程（如游戏、视频转码器、编译任务），一旦它退出，延迟 N 秒后执行电源动作。</p>
+    <p class="row"><b>价值：</b>「下完就关」「渲染完就关」的精确版本，比空闲检测更准确。可用 WMI 事件订阅 <code>Win32_ProcessStopTrace</code> 实现，不需要轮询。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">B3 · 倒计时悬浮窗</span><span class="b b-p1">建议</span></div>
+    <p class="row"><b>用途：</b>存在进行中的倒计时任务时，显示一个半透明、可拖拽、置顶的小窗口，实时显示剩余时间。</p>
+    <p class="row"><b>价值：</b>降低「忘记有任务在跑」导致的意外关机。ShutdownTimerClassic 用整窗变色来实现类似效果，悬浮窗对主界面干扰更小。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">B4 · 强制关闭 / 优雅关闭 双模式</span><span class="b b-p1">建议</span></div>
+    <p class="row"><b>用途：</b>每个任务可选是否加 <code>/f</code> 强制参数。<strong>优雅模式</strong>让应用自己退出（可能有程序弹窗阻止关机），<strong>强制模式</strong>直接结束进程。</p>
+    <p class="row"><b>价值：</b>ShutdownTimerClassic 的核心设计之一。默认优雅，把「可能失败」和「可能丢数据」的选择权交给用户。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">B5 · 电池感知</span><span class="b b-p1">建议</span></div>
+    <p class="row"><b>用途：</b>任务可配置为「仅接通电源时执行」，或「电量低于 X% 时执行关机」。</p>
+    <p class="row"><b>价值：</b>任务计划程序的 <code>DisallowStartIfOnBatteries</code> 默认值会静默吞掉任务，很多用户被这个默认值坑过。把它变成显式选项，并额外提供低电量自动关机——这是笔记本用户真正需要的。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">B6 · 关机前收尾动作</span><span class="b b-p1">建议</span><span class="b b-new">差异化</span></div>
+    <p class="row"><b>用途：</b>关机前依次执行可选的收尾动作：结束指定进程、断开 VPN / 网络映射盘、静音、清空回收站、锁定 BitLocker 卷、执行一段自定义脚本。</p>
+    <p class="row"><b>价值：</b>让「关机」从单一动作升级为一条工作流。尤其是「断开 VPN 再关机」，能避免公司网络策略导致的关机阻塞。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">B7 · 任务模板与一键预设</span><span class="b b-p1">建议</span></div>
+    <p class="row"><b>用途：</b>内置常用预设：「下班关机（工作日 18:30）」「睡前休眠（每天 23:30）」「下载完关机（空闲 20 分钟）」「午休锁定（每天 12:00）」。</p>
+    <p class="row"><b>价值：</b>把上手成本从「填表单」降到「点一下」。这是新用户留存的关键，也是同类软件普遍缺失的一环。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">B8 · 托盘常驻与快捷菜单</span><span class="b b-p1">建议</span></div>
+    <p class="row"><b>用途：</b>最小化到系统托盘；右键菜单提供「30 / 60 / 120 分钟后关机」「取消当前倒计时」「打开主界面」。</p>
+    <p class="row"><b>价值：</b>高频操作零层级直达。Chronoff、ShutdownTool 都做了托盘，属于事实标准。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">B9 · 执行日志与历史</span><span class="b b-p1">建议</span></div>
+    <p class="row"><b>用途：</b>记录每次任务的计划时间、实际执行时间、结果（成功 / 被取消 / 被阻止）、触发来源。</p>
+    <p class="row"><b>价值：</b>出问题时能定位（是任务没触发，还是触发了但被程序阻止）。数据源可直接读任务计划程序的 <code>LastRunTime</code> / <code>LastTaskResult</code>，再叠加本地的取消记录。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">B10 · 导入 / 导出配置</span><span class="b b-p1">建议</span></div>
+    <p class="row"><b>用途：</b>把全部任务导出为单个 JSON 文件，可导入到另一台机器。</p>
+    <p class="row"><b>价值：</b>换机迁移、给同事分发统一规则、备份。成本极低（序列化一个列表），收益明确。</p>
+  </div>
+
+  <h3>C. 差异化进阶（让产品有记忆点）</h3>
+
+  <div class="feat">
+    <div class="h"><span class="name">C1 · 全局热键触发</span><span class="b b-p2">进阶</span></div>
+    <p class="row"><b>用途：</b>给任意任务绑定全局快捷键，按下即执行。</p>
+    <p class="row"><b>价值：</b>zTasker 的招牌能力之一。对 PlanPower 而言，一个「Ctrl+Alt+S 立即睡眠」就足够有说服力。用 <code>RegisterHotKey</code> 实现，无额外依赖。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">C2 · 命令行接口</span><span class="b b-p2">进阶</span></div>
+    <p class="row"><b>用途：</b>支持 <code>PlanPower.exe /shutdown 30 /message "要关机了"</code> 这类静默参数，执行后立即退出，不显示界面。</p>
+    <p class="row"><b>价值：</b>可被批处理、快捷方式、其他软件调用，等于免费获得一个扩展生态。对开发者用户群尤其有吸引力。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">C3 · 关机前二次确认 / 密码保护</span><span class="b b-p2">进阶</span></div>
+    <p class="row"><b>用途：</b>可选设置密码，取消或修改进行中的任务必须输入密码。</p>
+    <p class="row"><b>价值：</b>Chronoff 的差异化功能。适用于家长控制（防止孩子取消定时关机）、公共机房、共享电脑。注意：这不是安全边界，只是防误操作。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">C4 · 随机延迟</span><span class="b b-p2">进阶</span></div>
+    <p class="row"><b>用途：</b>计划时间附加 ±N 分钟随机抖动，例如「23:00 ± 10 分钟」。</p>
+    <p class="row"><b>价值：</b>机房、办公室批量部署时，避免几十台机器同时关机造成瞬时负载冲击。实现成本几乎为零（在生成触发器时加随机偏移）。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">C5 · 局域网批量控制</span><span class="b b-p2">进阶</span></div>
+    <p class="row"><b>用途：</b>对同一网段内的其他 Windows 机器下发关机 / 重启指令。</p>
+    <p class="row"><b>价值：</b>基于系统自带的 <code>shutdown /m \\计算机名</code>，无需装客户端。适合小型办公网络、家庭多机。门槛在于目标机的凭据与防火墙配置，需要清晰的引导文案。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">C6 · 看门狗：有未保存工作则跳过</span><span class="b b-p2">进阶</span></div>
+    <p class="row"><b>用途：</b>执行前检查是否存在指定的「保护进程」（如 Word、Photoshop、IDE），若存在则跳过本次并记录日志，或延后 N 分钟重试。</p>
+    <p class="row"><b>价值：</b>把「强制关机」的风险降到最低。这是纯粹的体验加分项，能显著减少用户投诉。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">C7 · 网络条件触发</span><span class="b b-p2">进阶</span></div>
+    <p class="row"><b>用途：</b>「下载完成后（网速低于阈值持续 N 分钟）关机」或「断网超过 N 分钟后关机」。</p>
+    <p class="row"><b>价值：</b>比空闲检测更贴合下载场景。需要读取网卡计数器（PDH 性能计数器，系统自带），有一定实现成本，放在后期。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">C8 · 屏幕/显示器节能动作</span><span class="b b-p2">进阶</span></div>
+    <p class="row"><b>用途：</b>除关机外，支持「关闭显示器」「启动屏保」「锁定工作站」三个轻量动作。</p>
+    <p class="row"><b>价值：</b>不是所有场景都需要关机。短暂离开时关显示器比关机更合适。实现只需一条窗口消息广播，成本极低。</p>
+  </div>
+
+  <h3>D. 锦上添花（有余力再做）</h3>
+
+  <div class="feat">
+    <div class="h"><span class="name">D1 · 深色模式与主题色</span><span class="b b-tag">可选</span></div>
+    <p class="row"><b>用途与价值：</b>跟随系统深浅色，提供 2–3 种强调色。Chronoff 做了这件事且用户评价不错。WPF 下通过资源字典切换即可。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">D2 · 多语言界面</span><span class="b b-tag">可选</span></div>
+    <p class="row"><b>用途与价值：</b>中文 + 英文双语文案，用 <code>.resx</code> 资源文件管理，系统自带能力，无额外依赖。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">D3 · 高 DPI 与多显示器适配</span><span class="b b-tag">可选</span></div>
+    <p class="row"><b>用途与价值：</b>在 125% / 150% 缩放下不模糊、悬浮窗落在正确的显示器上。属于「不做会被骂」的基础质量项。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">D4 · 任务执行前语音/音效提示</span><span class="b b-tag">可选</span></div>
+    <p class="row"><b>用途与价值：</b>提醒窗口弹出时播放系统提示音，或在最后 10 秒用语音倒计时。增强临场感，对「在隔壁房间」的场景有用。</p>
+  </div>
+
+  <div class="feat">
+    <div class="h"><span class="name">D5 · 便携模式</span><span class="b b-tag">可选</span></div>
+    <p class="row"><b>用途与价值：</b>检测到同目录存在 <code>portable.flag</code> 时，配置写入程序目录而非 <code>%AppData%</code>，可直接放 U 盘使用。</p>
+  </div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="s4">
+  <h2><span class="num">4</span>整体功能清单</h2>
+  <p class="lede">按交付优先级分级。<span class="b b-p0">P0</span> 为 MVP 必须交付，<span class="b b-p1">P1</span> 为 v1.0，<span class="b b-p2">P2</span> 为后续迭代。</p>
+
+  <h3>4.1 电源动作（Action）</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>动作</th><th>实现组件</th><th>优先级</th><th>备注</th></tr></thead>
+    <tbody>
+      <tr><td><strong>关机</strong></td><td><code>shutdown /s</code></td><td><span class="b b-p0">P0</span></td><td>支持延迟、提示文本、强制/优雅</td></tr>
+      <tr><td><strong>重启</strong></td><td><code>shutdown /r</code></td><td><span class="b b-p0">P0</span></td><td>同上</td></tr>
+      <tr><td><strong>睡眠</strong></td><td>P/Invoke <code>SetSuspendState</code></td><td><span class="b b-p0">P0</span></td><td>有「启用休眠时会变成休眠」的坑，见 §7</td></tr>
+      <tr><td><strong>休眠</strong></td><td><code>shutdown /h</code></td><td><span class="b b-p0">P0</span></td><td>需系统已启用休眠</td></tr>
+      <tr><td><strong>注销</strong></td><td><code>shutdown /l</code></td><td><span class="b b-p1">P1</span></td><td>—</td></tr>
+      <tr><td><strong>锁定工作站</strong></td><td>P/Invoke <code>LockWorkStation</code></td><td><span class="b b-p1">P1</span></td><td>—</td></tr>
+      <tr><td><strong>关闭显示器</strong></td><td><code>WM_SYSCOMMAND</code> + <code>SC_MONITORPOWER</code></td><td><span class="b b-p2">P2</span></td><td>—</td></tr>
+      <tr><td><strong>取消已发起的关机</strong></td><td><code>shutdown /a</code></td><td><span class="b b-p0">P0</span></td><td>作为「取消本次」按钮的实现</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>4.2 触发方式（Trigger）</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>触发方式</th><th>说明</th><th>实现</th><th>优先级</th></tr></thead>
+    <tbody>
+      <tr><td><strong>倒计时</strong></td><td>N 小时 / 分钟 / 秒后执行</td><td>内存计时器</td><td><span class="b b-p0">P0</span></td></tr>
+      <tr><td><strong>指定时刻</strong></td><td>今天的某个时间点，已过则顺延</td><td>内存计时器 / 一次性任务</td><td><span class="b b-p0">P0</span></td></tr>
+      <tr><td><strong>每天</strong></td><td>每日固定时间重复</td><td>计划任务 DailyTrigger</td><td><span class="b b-p0">P0</span></td></tr>
+      <tr><td><strong>每周</strong></td><td>选定星期几重复</td><td>计划任务 WeeklyTrigger</td><td><span class="b b-p0">P0</span></td></tr>
+      <tr><td><strong>每月</strong></td><td>每月某日重复</td><td>计划任务 MonthlyTrigger</td><td><span class="b b-p1">P1</span></td></tr>
+      <tr><td><strong>开机时</strong></td><td>系统启动后执行</td><td>计划任务 BootTrigger</td><td><span class="b b-p1">P1</span></td></tr>
+      <tr><td><strong>登录时</strong></td><td>用户登录后执行</td><td>计划任务 LogonTrigger</td><td><span class="b b-p1">P1</span></td></tr>
+      <tr><td><strong>空闲时</strong></td><td>系统空闲超过 N 分钟</td><td>计划任务 IdleTrigger</td><td><span class="b b-p1">P1</span></td></tr>
+      <tr><td><strong>进程退出时</strong></td><td>指定进程结束后执行</td><td>WMI 事件订阅</td><td><span class="b b-p2">P2</span></td></tr>
+      <tr><td><strong>低电量时</strong></td><td>电量低于阈值</td><td><code>PowerModeChanged</code> 事件</td><td><span class="b b-p2">P2</span></td></tr>
+      <tr><td><strong>热键</strong></td><td>全局快捷键触发</td><td><code>RegisterHotKey</code></td><td><span class="b b-p2">P2</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>4.3 任务管理功能（CRUD + 启停）</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>功能</th><th>交互位置</th><th>优先级</th></tr></thead>
+    <tbody>
+      <tr><td><strong>创建任务</strong> — 三步向导：选动作 → 选时间 → 高级选项，实时生成自然语言预览</td><td>主界面「＋ 新建任务」</td><td><span class="b b-p0">P0</span></td></tr>
+      <tr><td><strong>查看任务列表</strong> — 卡片列表，显示动作、规则、下次执行时间、状态</td><td>主界面</td><td><span class="b b-p0">P0</span></td></tr>
+      <tr><td><strong>编辑任务</strong> — 复用创建向导，预填现有值</td><td>列表行「编辑」</td><td><span class="b b-p0">P0</span></td></tr>
+      <tr><td><strong>删除任务</strong> — 二次确认，同步删除系统计划任务</td><td>列表行「删除」</td><td><span class="b b-p0">P0</span></td></tr>
+      <tr><td><strong>启用 / 停用</strong> — 行内开关，即时生效（<code>schtasks /change /enable</code>）</td><td>列表行开关</td><td><span class="b b-p0">P0</span></td></tr>
+      <tr><td><strong>立即执行一次</strong> — 不改变计划规则，立即触发一次</td><td>列表行「▷」</td><td><span class="b b-p0">P0</span></td></tr>
+      <tr><td><strong>复制任务</strong> — 以现有任务为模板快速派生</td><td>列表行右键菜单</td><td><span class="b b-p1">P1</span></td></tr>
+      <tr><td><strong>筛选与搜索</strong> — 全部 / 运行中 / 已停用 / 已完成 + 关键词搜索</td><td>列表顶部</td><td><span class="b b-p1">P1</span></td></tr>
+      <tr><td><strong>排序</strong> — 按下次执行时间 / 创建时间 / 名称</td><td>列表顶部</td><td><span class="b b-p1">P1</span></td></tr>
+      <tr><td><strong>批量操作</strong> — 全选停用、批量删除</td><td>列表顶部</td><td><span class="b b-p2">P2</span></td></tr>
+      <tr><td><strong>导入 / 导出</strong> — JSON 全量备份与恢复</td><td>设置页</td><td><span class="b b-p1">P1</span></td></tr>
+      <tr><td><strong>执行历史</strong> — 每次执行的计划时间、实际时间、结果</td><td>任务详情 / 独立日志页</td><td><span class="b b-p1">P1</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="s5">
+  <h2><span class="num">5</span>技术实现思路</h2>
+  <p class="lede">这是整个方案的核心：如何在「零第三方依赖」的约束下，做出一个可靠、可持久化、体验现代的任务管理器。</p>
+
+  <h3>5.1 技术栈选型</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>方案</th><th>运行库依赖</th><th>体积</th><th>UI 能力</th><th>开发成本</th><th>评价</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>C# + WPF<br>+ .NET Framework 4.8</strong></td>
+        <td>系统内置<br>（Win10 1903+ 预装）</td>
+        <td>约 300 KB – 1 MB</td>
+        <td>强，XAML 数据绑定、样式模板完善</td>
+        <td>中</td>
+        <td><span class="b b-new">推荐</span> 满足零依赖约束，UI 表现力最好</td>
+      </tr>
+      <tr>
+        <td>C# + WinForms<br>+ .NET Framework 4.8</td>
+        <td>系统内置</td>
+        <td>约 150 – 500 KB</td>
+        <td>中，控件老旧需自绘</td>
+        <td>低</td>
+        <td>启动最快、代码最简；UI 现代感不足。适合「极简优先」的取舍</td>
+      </tr>
+      <tr>
+        <td>C++ / Win32<br>+ COM</td>
+        <td>无</td>
+        <td>约 150 – 300 KB</td>
+        <td>弱，需手写控件或引入资源</td>
+        <td>高</td>
+        <td>体积与依赖的极致，但 UI 开发代价过大</td>
+      </tr>
+      <tr>
+        <td>C# + .NET 8/9/10<br>（自包含 AOT）</td>
+        <td>无（自包含）</td>
+        <td>约 10 – 15 MB</td>
+        <td>强</td>
+        <td>中</td>
+        <td>体积换独立性。Chronoff 走的是这条路（.NET 10 + WPF）</td>
+      </tr>
+      <tr>
+        <td>PowerShell + WinForms</td>
+        <td>系统内置</td>
+        <td>脚本文件</td>
+        <td>中</td>
+        <td>低</td>
+        <td>无需编译，但启动慢、有控制台闪窗、易被杀软误报，不适合作为正式产品</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <p><b>选型结论：</b>主方案 <strong>C# + WPF + .NET Framework 4.8</strong>。理由有三：</p>
+    <p>① .NET Framework 4.8 是 Windows 10 1903 及以后版本的<strong>系统组件</strong>，不需要用户安装任何东西，严格满足「无第三方运行库依赖」；</p>
+    <p>② WPF 的 XAML 数据绑定 + 样式模板，是做「卡片列表 + 向导式表单 + 悬浮窗」这类现代 UI 的最短路径；</p>
+    <p>③ 编译产物是纯托管程序集，单文件 exe 通常 &lt; 1 MB，远小于 .NET 8 自包含方案的 10 MB+。</p>
+    <p>如果后续对体积或启动速度有极致要求，可以降级到 WinForms 重写界面层——<strong>业务层代码完全不用改</strong>，这也是下面分层设计的价值所在。</p>
+  </div>
+
+  <h3>5.2 双引擎调度架构（核心设计）</h3>
+  <p>这是本方案与同类软件最重要的区别。任务按性质分派给两个引擎，但用户在界面上看到的是<strong>一份统一列表</strong>。</p>
+
+  <div class="diagram">
+  <svg viewBox="0 0 1000 430" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:760px;">
+    <defs>
+      <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+        <path d="M0,0 L9,4.5 L0,9 z" fill="#94a3b8"/>
+      </marker>
+    </defs>
+
+    <!-- UI Layer -->
+    <rect x="20" y="20" width="960" height="78" rx="10" fill="#eff4ff" stroke="#bfdbfe"/>
+    <text x="40" y="48" font-family="sans-serif" font-size="14" font-weight="700" fill="#1e3a8a">UI 层（WPF / XAML）</text>
+    <text x="40" y="72" font-family="sans-serif" font-size="12.5" fill="#3b5bdb">主任务列表　·　新建/编辑向导　·　倒计时悬浮窗　·　托盘图标与菜单　·　提醒弹窗</text>
+
+    <!-- ViewModel -->
+    <rect x="20" y="118" width="960" height="56" rx="10" fill="#f5f3ff" stroke="#ddd6fe"/>
+    <text x="40" y="142" font-family="sans-serif" font-size="14" font-weight="700" fill="#5b21b6">ViewModel 层</text>
+    <text x="40" y="163" font-family="sans-serif" font-size="12.5" fill="#6d28d9">TaskListViewModel（合并双引擎数据源，对外呈现统一任务视图）　·　Command 绑定</text>
+
+    <!-- Service -->
+    <rect x="20" y="194" width="960" height="96" rx="10" fill="#f0fdfa" stroke="#99f6e4"/>
+    <text x="40" y="218" font-family="sans-serif" font-size="14" font-weight="700" fill="#0f766e">Service 层（统一调度门面 TaskOrchestrator）</text>
+    <text x="40" y="241" font-family="sans-serif" font-size="12.5" fill="#0d9488">创建 / 编辑 / 删除 / 启停任务时，由门面根据「任务性质」决定写入哪个引擎，并保证两边状态一致</text>
+    <text x="40" y="265" font-family="sans-serif" font-size="12.5" fill="#0d9488">TimerEngine（内存计时）　│　SchedulerEngine（系统计划任务）　│　PowerActionExecutor（动作执行）</text>
+
+    <!-- Engines -->
+    <rect x="20" y="312" width="466" height="98" rx="10" fill="#ffffff" stroke="#e5e7eb"/>
+    <text x="40" y="338" font-family="sans-serif" font-size="13.5" font-weight="700" fill="#1f2937">引擎 A · TimerEngine（内存计时器）</text>
+    <text x="40" y="360" font-family="sans-serif" font-size="12" fill="#4b5563">适用：倒计时、当天指定时刻、临时一次性任务</text>
+    <text x="40" y="380" font-family="sans-serif" font-size="12" fill="#4b5563">实现：System.Threading.Timer + 本地 JSON 持久化</text>
+    <text x="40" y="400" font-family="sans-serif" font-size="12" fill="#6b7280">特点：免提权、可暂停/继续、即时改时间；软件退出即失效</text>
+
+    <rect x="514" y="312" width="466" height="98" rx="10" fill="#ffffff" stroke="#e5e7eb"/>
+    <text x="534" y="338" font-family="sans-serif" font-size="13.5" font-weight="700" fill="#1f2937">引擎 B · SchedulerEngine（系统计划任务）</text>
+    <text x="534" y="360" font-family="sans-serif" font-size="12" fill="#4b5563">适用：每日/每周/每月重复、开机/登录/空闲、需唤醒执行</text>
+    <text x="534" y="380" font-family="sans-serif" font-size="12" fill="#4b5563">实现：COM ITaskService（主）／ schtasks.exe + XML（备）</text>
+    <text x="534" y="400" font-family="sans-serif" font-size="12" fill="#6b7280">特点：跨重启存活、可唤醒休眠、软件可完全退出</text>
+
+    <!-- arrows -->
+    <line x1="500" y1="98" x2="500" y2="116" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar)"/>
+    <line x1="500" y1="174" x2="500" y2="192" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar)"/>
+    <line x1="253" y1="290" x2="253" y2="310" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar)"/>
+    <line x1="747" y1="290" x2="747" y2="310" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar)"/>
+
+    <!-- OS -->
+    <rect x="20" y="424" width="960" height="0" rx="10" fill="none"/>
+  </svg>
+  </div>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>任务特征</th><th>走哪个引擎</th><th>原因</th></tr></thead>
+    <tbody>
+      <tr><td>「30 分钟后关机」（倒计时）</td><td>TimerEngine</td><td>无需提权、可随时暂停改时间，反馈即时</td></tr>
+      <tr><td>「今天 22:00 关机」（一次性）</td><td>TimerEngine<br>（可升级为 B）</td><td>时间近，常驻内存成本可忽略</td></tr>
+      <tr><td>「每天 23:00 关机」（重复）</td><td>SchedulerEngine</td><td>必须跨重启存活</td></tr>
+      <tr><td>「工作日 08:30 唤醒开机」</td><td>SchedulerEngine</td><td>需要 WakeToRun，且此时软件未运行</td></tr>
+      <tr><td>「空闲 20 分钟后关机」</td><td>SchedulerEngine</td><td>直接用系统 ONIDLE 触发器</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note ok">
+    <p><b>为什么不做成「全部走系统计划任务」？</b>因为创建系统级任务需要管理员权限，而「我就想 30 分钟后关个机」这种高频轻量场景不值得每次都弹 UAC。双引擎的本质是<b>按需提权</b>：轻量任务完全不碰系统，只有需要持久化时才触发一次提权。</p>
+  </div>
+
+  <h3>5.3 系统组件映射表</h3>
+  <p>全部功能都落在系统自带能力上，没有任何外部依赖。</p>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>能力</th><th>调用的系统组件</th><th>备注</th></tr></thead>
+    <tbody>
+      <tr><td>关机 / 重启 / 注销 / 休眠</td><td><code>shutdown.exe</code></td><td><code>/s /r /l /h</code>，可加 <code>/t /f /c /d</code></td></tr>
+      <tr><td>取消已排期的关机</td><td><code>shutdown.exe /a</code></td><td>仅在 <code>/t</code> 延迟期内有效</td></tr>
+      <tr><td>睡眠</td><td>P/Invoke <code>powrprof.dll!SetSuspendState</code></td><td>注意休眠陷阱，见 §7</td></tr>
+      <tr><td>锁定工作站</td><td>P/Invoke <code>user32.dll!LockWorkStation</code></td><td>—</td></tr>
+      <tr><td>关闭显示器</td><td><code>SendMessage(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER, 2)</code></td><td>广播窗口消息</td></tr>
+      <tr><td>创建 / 删除 / 启停任务</td><td><code>schtasks.exe</code> 或 COM <code>ITaskService</code></td><td>见 §5.4</td></tr>
+      <tr><td>查询任务详情</td><td>COM <code>ITaskService</code> / <code>schtasks /query /xml</code></td><td>避免解析本地化文本</td></tr>
+      <tr><td>查看已注册的唤醒定时器</td><td><code>powercfg /waketimers</code></td><td>让用户确认硬件是否真会唤醒</td></tr>
+      <tr><td>检查睡眠 / 休眠可用性</td><td><code>powercfg /a</code></td><td>现代待机（S0）机型需特殊提示</td></tr>
+      <tr><td>防止执行期间系统睡眠</td><td><code>SetThreadExecutionState(ES_CONTINUOUS \| ES_SYSTEM_REQUIRED)</code></td><td>仅在「保持唤醒直到任务完成」选项开启时使用</td></tr>
+      <tr><td>监听锁屏 / 电源状态变化</td><td><code>Microsoft.Win32.SystemEvents</code> 的 <code>SessionSwitch</code> / <code>PowerModeChanged</code></td><td>.NET 内置</td></tr>
+      <tr><td>监听进程退出</td><td>WMI <code>Win32_ProcessStopTrace</code> 事件</td><td><code>System.Management</code> 为 .NET 内置程序集</td></tr>
+      <tr><td>全局热键</td><td>P/Invoke <code>RegisterHotKey</code></td><td>—</td></tr>
+      <tr><td>提权</td><td>应用清单 <code>requestedExecutionLevel</code> 或 <code>ShellExecute</code> 的 <code>runas</code> 动词</td><td>见 §5.5</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>5.4 与任务计划程序集成：三条路径，按需选择</h3>
+
+  <h4>路径一（首选）：COM ITaskService</h4>
+  <p>任务计划程序的官方编程接口，返回结构化对象，不受系统语言影响。C# 中通过 COM 互操作调用——注意这里<strong>不需要引 NuGet 包</strong>（网上流传的 <code>Microsoft.Win32.TaskScheduler</code> 是第三方库，本方案不用它），而是手写 COM 接口声明或使用 <code>Type.GetTypeFromProgID</code> + <code>dynamic</code>。</p>
+  <pre><code><span class="c">// 连接任务计划程序服务（COM ProgID: Schedule.Service）</span>
+<span class="k">var</span> type = Type.GetTypeFromProgID(<span class="s">"Schedule.Service"</span>);
+<span class="k">dynamic</span> svc = Activator.CreateInstance(type);
+svc.Connect();
+
+<span class="c">// 打开我们自己的任务文件夹（不存在则创建）</span>
+<span class="k">dynamic</span> root = svc.GetFolder(<span class="s">"\\"</span>);
+<span class="k">dynamic</span> folder;
+<span class="k">try</span> { folder = svc.GetFolder(<span class="s">"\\PlanPower"</span>); }
+<span class="k">catch</span> { folder = root.CreateFolder(<span class="s">"PlanPower"</span>); }
+
+<span class="c">// 枚举全部任务</span>
+<span class="k">foreach</span> (<span class="k">dynamic</span> t <span class="k">in</span> folder.GetTasks(1))   <span class="c">// 1 = TASK_ENUM_HIDDEN</span>
+{
+    Console.WriteLine($<span class="s">"{t.Name}  下次执行: {t.NextRunTime}  状态: {t.State}"</span>);
+}</code></pre>
+
+  <h4>路径二（备用）：schtasks.exe + XML 模板</h4>
+  <p>当 COM 调用因环境问题失败时降级使用。做法是先生成任务 XML 写入临时文件，再执行 <code>schtasks /create /xml</code>。</p>
+  <div class="note warn">
+    <p><b>两个必须注意的坑：</b>① <code>schtasks /create /xml</code> 要求 XML 文件为 <b>UTF-16 LE 带 BOM</b> 编码，用 UTF-8 会直接报错；② 路径含中文或空格时，<code>/tn</code> 参数必须完整加引号。</p>
+  </div>
+  <pre><code><span class="c">&lt;?xml version="1.0" encoding="UTF-16"?&gt;</span>
+<span class="t">&lt;Task</span> version=<span class="s">"1.2"</span> xmlns=<span class="s">"http://schemas.microsoft.com/windows/2004/02/mit/task"</span><span class="t">&gt;</span>
+  <span class="t">&lt;RegistrationInfo&gt;</span>
+    <span class="t">&lt;Description&gt;</span>PlanPower 任务：工作日 23:00 关机<span class="t">&lt;/Description&gt;</span>
+    <span class="t">&lt;Author&gt;</span>PlanPower<span class="t">&lt;/Author&gt;</span>
+  <span class="t">&lt;/RegistrationInfo&gt;</span>
+
+  <span class="t">&lt;Triggers&gt;</span>
+    <span class="t">&lt;CalendarTrigger&gt;</span>
+      <span class="t">&lt;StartBoundary&gt;</span>2026-10-12T23:00:00<span class="t">&lt;/StartBoundary&gt;</span>
+      <span class="t">&lt;Enabled&gt;</span>true<span class="t">&lt;/Enabled&gt;</span>
+      <span class="t">&lt;ScheduleByWeek&gt;</span>
+        <span class="t">&lt;WeeksInterval&gt;</span>1<span class="t">&lt;/WeeksInterval&gt;</span>
+        <span class="t">&lt;DaysOfWeek&gt;&lt;Monday/&gt;&lt;Tuesday/&gt;&lt;Wednesday/&gt;&lt;Thursday/&gt;&lt;Friday/&gt;&lt;/DaysOfWeek&gt;</span>
+      <span class="t">&lt;/ScheduleByWeek&gt;</span>
+    <span class="t">&lt;/CalendarTrigger&gt;</span>
+  <span class="t">&lt;/Triggers&gt;</span>
+
+  <span class="c">&lt;!-- S-1-5-18 = LOCAL SYSTEM：无人登录也能执行 --&gt;</span>
+  <span class="t">&lt;Principals&gt;</span>
+    <span class="t">&lt;Principal</span> id=<span class="s">"Author"</span><span class="t">&gt;</span>
+      <span class="t">&lt;UserId&gt;</span>S-1-5-18<span class="t">&lt;/UserId&gt;</span>
+      <span class="t">&lt;RunLevel&gt;</span>HighestAvailable<span class="t">&lt;/RunLevel&gt;</span>
+    <span class="t">&lt;/Principal&gt;</span>
+  <span class="t">&lt;/Principals&gt;</span>
+
+  <span class="t">&lt;Settings&gt;</span>
+    <span class="t">&lt;MultipleInstancesPolicy&gt;</span>IgnoreNew<span class="t">&lt;/MultipleInstancesPolicy&gt;</span>
+    <span class="c">&lt;!-- 关键：默认值 true 会让笔记本在电池下静默不执行 --&gt;</span>
+    <span class="t">&lt;DisallowStartIfOnBatteries&gt;</span>false<span class="t">&lt;/DisallowStartIfOnBatteries&gt;</span>
+    <span class="t">&lt;StopIfGoingOnBatteries&gt;</span>false<span class="t">&lt;/StopIfGoingOnBatteries&gt;</span>
+    <span class="c">&lt;!-- 错过后开机补跑 --&gt;</span>
+    <span class="t">&lt;StartWhenAvailable&gt;</span>true<span class="t">&lt;/StartWhenAvailable&gt;</span>
+    <span class="c">&lt;!-- 允许唤醒处于睡眠/休眠的电脑 --&gt;</span>
+    <span class="t">&lt;WakeToRun&gt;</span>true<span class="t">&lt;/WakeToRun&gt;</span>
+    <span class="t">&lt;ExecutionTimeLimit&gt;</span>PT5M<span class="t">&lt;/ExecutionTimeLimit&gt;</span>
+    <span class="t">&lt;Enabled&gt;</span>true<span class="t">&lt;/Enabled&gt;</span>
+  <span class="t">&lt;/Settings&gt;</span>
+
+  <span class="t">&lt;Actions</span> Context=<span class="s">"Author"</span><span class="t">&gt;</span>
+    <span class="t">&lt;Exec&gt;</span>
+      <span class="t">&lt;Command&gt;</span>shutdown.exe<span class="t">&lt;/Command&gt;</span>
+      <span class="t">&lt;Arguments&gt;</span>/s /t 60 /c "系统将在 60 秒后关机"<span class="t">&lt;/Arguments&gt;</span>
+    <span class="t">&lt;/Exec&gt;</span>
+  <span class="t">&lt;/Actions&gt;</span>
+<span class="t">&lt;/Task&gt;</span></code></pre>
+
+  <h4>路径三（兜底）：直接操作 Tasks 目录 + 注册表</h4>
+  <p>任务计划程序把每个任务以 XML 文件存放在 <code>%SystemRoot%\System32\Tasks\</code> 下，运行时启用状态则在 <code>HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Tree\</code>。仅在 COM 与 CLI 双双不可用时作为最后的诊断手段，<strong>不建议作为常规实现路径</strong>。</p>
+
+  <div class="note warn">
+    <p><b>为什么不用 <code>schtasks /query /fo csv /v</code> 做数据源？</b>因为它的输出<strong>表头会随系统语言变化</strong>——中文系统上是「任务名 / 下次运行时间」，英文系统上是 "TaskName / Next Run Time"。靠解析这个文本来枚举任务，换台机器就崩。枚举一律走 COM 或 <code>/xml</code>。</p>
+  </div>
+
+  <h3>5.5 权限与提权模型</h3>
+  <p>这是决定用户体验好坏的关键设计。三种方案对比：</p>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>方案</th><th>体验</th><th>问题</th><th>取舍</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>清单声明 <code>requireAdministrator</code></td>
+        <td>每次启动弹 UAC</td>
+        <td>拖拽文件失效、托盘与资源管理器交互受限；日常查看任务也要提权，很烦</td>
+        <td>简单但不优雅</td>
+      </tr>
+      <tr>
+        <td>清单声明 <code>asInvoker</code>，全程不提权</td>
+        <td>最清爽</td>
+        <td>无法创建 SYSTEM 权限的计划任务，引擎 B 直接不可用</td>
+        <td>功能残缺</td>
+      </tr>
+      <tr>
+        <td><strong>asInvoker + 按需提权辅助进程</strong></td>
+        <td>日常零打扰</td>
+        <td>需多写一个辅助进程入口与 IPC</td>
+        <td><span class="b b-new">推荐</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>推荐方案的流程：主程序以普通权限运行 → 用户点击「保存任务」且该任务需要写入系统计划任务时 → 主程序用 <code>ShellExecute</code> 加 <code>runas</code> 动词拉起自身（带 <code>/elevated-write</code> 参数）→ 提权实例执行 <code>schtasks</code> 命令 → 返回结果 → 主程序刷新列表。整个过程只弹一次 UAC。</p>
+
+  <pre><code><span class="c">// 主程序：按需提权</span>
+<span class="k">var</span> psi = <span class="k">new</span> ProcessStartInfo
+{
+    FileName        = Application.ExecutablePath,
+    Arguments       = <span class="s">"/elevated-write \"" + taskXmlTempFile + <span class="s">"\""</span></span>,
+    Verb            = <span class="s">"runas"</span>,          <span class="c">// 触发 UAC</span>
+    UseShellExecute = <span class="k">true</span>
+};
+<span class="k">try</span> { Process.Start(psi)?.WaitForExit(); }
+<span class="k">catch</span> (Win32Exception) { <span class="c">/* 用户点了「否」，友好提示并保留草稿 */</span> }</code></pre>
+
+  <h3>5.6 数据模型与存储</h3>
+  <p><strong>权威数据源是系统任务计划程序</strong>（引擎 B 的任务）与<strong>本地 JSON</strong>（引擎 A 的任务 + 全部 UI 扩展元数据）。两者用任务名中的 GUID 后缀做映射。</p>
+
+  <pre><code><span class="k">class</span> PowerTask
+{
+    <span class="k">public</span> Guid      Id            { <span class="k">get</span>; <span class="k">set</span>; }
+    <span class="k">public</span> <span class="k">string</span>    Name          { <span class="k">get</span>; <span class="k">set</span>; }   <span class="c">// 用户可见名称</span>
+    <span class="k">public</span> PowerAction Action      { <span class="k">get</span>; <span class="k">set</span>; }   <span class="c">// Shutdown/Restart/Sleep/...</span>
+    <span class="k">public</span> ScheduleKind Kind       { <span class="k">get</span>; <span class="k">set</span>; }   <span class="c">// Countdown/Once/Daily/Weekly/...</span>
+    <span class="k">public</span> TriggerSpec  Trigger    { <span class="k">get</span>; <span class="k">set</span>; }   <span class="c">// 时间参数（多态）</span>
+
+    <span class="c">// ---- UI 扩展元数据（系统任务里存不下，存在本地 JSON）----</span>
+    <span class="k">public</span> <span class="k">int</span>       NoticeSeconds { <span class="k">get</span>; <span class="k">set</span>; }   <span class="c">// 提前提醒秒数，默认 60</span>
+    <span class="k">public</span> <span class="k">bool</span>      ForceClose    { <span class="k">get</span>; <span class="k">set</span>; }   <span class="c">// 是否加 /f</span>
+    <span class="k">public</span> <span class="k">string</span>    Message       { <span class="k">get</span>; <span class="k">set</span>; }   <span class="c">// 关机提示文本</span>
+    <span class="k">public</span> <span class="k">bool</span>      WakeToRun     { <span class="k">get</span>; <span class="k">set</span>; }
+    <span class="k">public</span> <span class="k">bool</span>      RunOnlyOnAC   { <span class="k">get</span>; <span class="k">set</span>; }
+    <span class="k">public</span> <span class="k">bool</span>      Enabled       { <span class="k">get</span>; <span class="k">set</span>; }
+    <span class="k">public</span> List&lt;<span class="k">string</span>&gt; PreActions  { <span class="k">get</span>; <span class="k">set</span>; }   <span class="c">// 收尾动作</span>
+
+    <span class="c">// ---- 运行时状态（从系统查询，不持久化）----</span>
+    <span class="k">public</span> DateTime? LastRunTime   { <span class="k">get</span>; <span class="k">set</span>; }
+    <span class="k">public</span> DateTime? NextRunTime   { <span class="k">get</span>; <span class="k">set</span>; }
+    <span class="k">public</span> <span class="k">int</span>       LastResult    { <span class="k">get</span>; <span class="k">set</span>; }
+    <span class="k">public</span> Engine    Owner         { <span class="k">get</span>; <span class="k">set</span>; }   <span class="c">// Timer / TaskScheduler</span>
+}</code></pre>
+
+  <p>存储位置：</p>
+  <ul>
+    <li>配置与元数据：<code>%AppData%\PlanPower\tasks.json</code>（便携模式下改为程序目录）</li>
+    <li>序列化：用 .NET 内置的 <code>DataContractJsonSerializer</code> 或 <code>JavaScriptSerializer</code>，<strong>不引 Newtonsoft.Json</strong></li>
+    <li>系统任务命名规范：<code>\PlanPower\{用户名称}_{Id 前 8 位}</code>，便于枚举时精确过滤、避免污染用户已有任务</li>
+  </ul>
+
+  <h3>5.7 模块划分</h3>
+  <pre><code>PlanPower/
+├─ PlanPower.exe                主程序（WPF，asInvoker 清单）
+├─ Core/                        业务层（与 UI 框架解耦，可整体复用到 WinForms）
+│   ├─ Models/PowerTask.cs
+│   ├─ Storage/TaskStore.cs            本地 JSON 读写
+│   ├─ Engines/TimerEngine.cs          内存倒计时引擎
+│   ├─ Engines/SchedulerEngine.cs      系统计划任务引擎（COM + CLI 双实现）
+│   ├─ Engines/TaskOrchestrator.cs     统一门面，路由 + 状态同步
+│   ├─ Actions/PowerActionExecutor.cs  动作执行与取消
+│   ├─ Actions/PreActionRunner.cs      收尾动作流水线
+│   ├─ Native/NativeMethods.cs         P/Invoke 声明集中处
+│   └─ Security/ElevationHelper.cs     按需提权
+├─ UI/
+│   ├─ MainWindow.xaml                 任务列表主界面
+│   ├─ TaskEditorWindow.xaml           三步向导
+│   ├─ CountdownOverlay.xaml           悬浮倒计时窗
+│   ├─ NoticeWindow.xaml               执行前提醒窗
+│   └─ TrayController.cs               托盘图标与菜单
+└─ Resources/
+    ├─ Themes/Light.xaml, Dark.xaml
+    └─ Presets/templates.json          任务模板</code></pre>
+
+  <h3>5.8 关键流程：创建一条「工作日 23:00 关机」</h3>
+  <ol>
+    <li>用户在向导里选「关机」→「每周」→ 勾选周一至周五 → 时间 23:00 → 提前提醒 60 秒 → 强制关闭程序（否）。</li>
+    <li>向导底部实时生成自然语言预览：<em>「每个工作日 23:00 关闭计算机，提前 60 秒提醒，等待程序自行退出。」</em></li>
+    <li>点击保存 → <code>TaskOrchestrator</code> 判定为「重复任务」→ 路由到 <code>SchedulerEngine</code>。</li>
+    <li>生成任务 XML 到临时文件 → 提权实例执行 <code>schtasks /create /tn "\PlanPower\工作日关机_a1b2c3d4" /xml "temp.xml" /f</code>。</li>
+    <li>写入成功 → 把 UI 元数据写入本地 <code>tasks.json</code> → 刷新列表，显示「下次执行：今天 23:00」。</li>
+    <li>到点前 60 秒，若主程序在运行则弹出提醒窗；用户点「取消本次」→ 执行 <code>shutdown /a</code> 并记录日志；未操作则系统按计划执行关机。</li>
+  </ol>
+
+  <div class="note">
+    <p><b>细节设计：</b>任务执行前 60 秒的提醒由谁负责？如果主程序没运行，就没有提醒窗——这是「可持久化」的代价。折中方案是在任务 XML 里把实际命令写成两段：<code>shutdown /s /t 60 /c "..."</code>，让 Windows 自己在系统层弹出倒计时提示，用户仍可用 <code>shutdown /a</code> 取消。这样即使 PlanPower 完全没运行，用户也有 60 秒反悔窗口。</p>
+  </div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="s6">
+  <h2><span class="num">6</span>界面设计</h2>
+  <p class="lede">设计目标：打开就能看懂，不查文档也会用。配套的高保真原型见同目录 <code>PlanPower_界面原型.html</code>。</p>
+
+  <h3>6.1 主界面布局</h3>
+  <pre><code>┌──────────────────────────────────────────────────────────────────┐
+│  PlanPower  定时电源管理                    [＋ 新建任务]  [⚙]   │
+├──────────────────────────────────────────────────────────────────┤
+│  [ 全部 5 ] [ 运行中 3 ] [ 已停用 1 ] [ 已完成 1 ]     🔍 搜索…   │
+├──────────────────────────────────────────────────────────────────┤
+│ ● 每个工作日 23:00 关机                       下次 今天 23:00  ▣ │
+│   关机 · 提前 60 秒提醒 · 优雅关闭                    ⋯  ▷  ✎  🗑 │
+├──────────────────────────────────────────────────────────────────┤
+│ ● 工作日 08:30 唤醒并开机                     下次 明天 08:30  ▣ │
+│   唤醒执行 · 仅接通电源 · 错过后补跑                  ⋯  ▷  ✎  🗑 │
+├──────────────────────────────────────────────────────────────────┤
+│ ○ 一次性 · 30 分钟后睡眠                      已停用          ▣ │
+│   睡眠 · 无提醒                                       ⋯  ▷  ✎  🗑 │
+├──────────────────────────────────────────────────────────────────┤
+│  已注册 3 个系统任务 · 1 个内存计时任务 · 权限：标准用户          │
+└──────────────────────────────────────────────────────────────────┘
+   ● 启用   ○ 停用   ▣ 启用开关   ⋯ 更多   ▷ 立即执行   ✎ 编辑   🗑 删除</code></pre>
+
+  <h3>6.2 新建任务向导（三步）</h3>
+  <div class="grid-3">
+    <div class="card tight">
+      <h4 style="margin-top:0">第 1 步 · 做什么</h4>
+      <p style="font-size:13.5px;margin:0">七个大按钮（图标 + 文字）：关机 / 重启 / 睡眠 / 休眠 / 注销 / 锁定 / 关闭显示器。鼠标悬停时用一句话解释差异。</p>
+    </div>
+    <div class="card tight">
+      <h4 style="margin-top:0">第 2 步 · 什么时候</h4>
+      <p style="font-size:13.5px;margin:0">五张卡片：倒计时 / 指定时刻 / 每天 / 每周 / 空闲时。选中后展开对应的最小必要参数，不显示无关字段。</p>
+    </div>
+    <div class="card tight">
+      <h4 style="margin-top:0">第 3 步 · 细节</h4>
+      <p style="font-size:13.5px;margin:0">提前提醒秒数、关机提示文本、强制关闭程序、唤醒执行、仅接通电源时运行。全部有默认值，可直接「完成」。</p>
+    </div>
+  </div>
+
+  <div class="note ok">
+    <p><b>贯穿全程的自然语言预览条</b>（固定在向导底部）：</p>
+    <p style="font-size:14.5px;color:#0f766e;font-weight:600;margin-bottom:0">「每个工作日 <b>23:00</b> 关闭计算机，提前 <b>60 秒</b> 提醒，等待程序自行退出。」</p>
+    <p style="margin-top:8px;margin-bottom:0">用户不用理解「触发器」「StartBoundary」这些概念，只要读这句话不别扭，配置就是对的。这是降低认知负担最有效的一招。</p>
+  </div>
+
+  <h3>6.3 交互细节约定</h3>
+  <ul>
+    <li><strong>启用开关是行内的</strong>，点击立即生效，不需要进详情页——这是最高频的操作。</li>
+    <li><strong>删除必须二次确认</strong>，确认框里直接显示任务的自然语言描述，避免误删。</li>
+    <li><strong>倒计时任务</strong>在列表中高亮并显示实时剩余时间（每秒刷新，用 <code>DispatcherTimer</code>）。</li>
+    <li><strong>危险动作有颜色区分</strong>：关机 / 重启用暖色标识，锁定 / 关屏用中性色，视觉上区分「会丢数据」和「不会」。</li>
+    <li><strong>空状态有引导</strong>：没有任务时显示模板卡片（「下班关机」「下载完关机」），点击即创建。</li>
+    <li><strong>状态栏常驻显示权限状态</strong>：让用户知道当前是「标准用户」还是「已提权」，出问题时能自助判断。</li>
+  </ul>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="s7">
+  <h2><span class="num">7</span>已知风险与技术坑</h2>
+  <p class="lede">这些是实际开发时一定会撞上的问题，提前列出比事后 debug 便宜得多。</p>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>#</th><th>问题</th><th>影响</th><th>应对</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><strong>睡眠变成休眠</strong>：<code>SetSuspendState(false, false, false)</code> 在系统已启用休眠时，实际执行的是休眠而非睡眠</td>
+        <td>用户以为电脑会秒醒，结果半小时才启动</td>
+        <td>优先使用 <code>NtSetSystemPowerState</code>（PowerActionSleep）；或调用前用 <code>powercfg /a</code> 检测，若休眠已启用则明确提示用户「当前将执行休眠」，并在设置里提供一键 <code>powercfg /h off</code> 的说明</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><strong>现代待机（Modern Standby / S0）机型行为不同</strong></td>
+        <td><code>powercfg /a</code> 显示 S0，不支持传统 S3 睡眠，唤醒定时器行为不一致</td>
+        <td>启动时检测，若为 S0 机型则隐藏「唤醒执行」选项并给出说明，避免用户配了却无效</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><strong>快速启动导致的混合关机</strong>：Win10 默认开启快速启动，「关机」实际是混合关机，不完全断电</td>
+        <td>某些场景（换硬件、进 BIOS）行为不符预期</td>
+        <td>在高级设置中提供「使用完全关机（<code>/full</code> 或先 <code>powercfg /h off</code>）」选项并解释差异</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><strong>计划任务在电池供电时被静默跳过</strong></td>
+        <td>笔记本用户配了任务却完全不执行，且没有任何报错</td>
+        <td>生成 XML 时显式写入 <code>&lt;DisallowStartIfOnBatteries&gt;false&lt;/DisallowStartIfOnBatteries&gt;</code>，并在 UI 上把「仅接通电源时运行」做成可见选项而非隐藏默认值</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><strong>XML 编码问题</strong>：<code>schtasks /create /xml</code> 要求 UTF-16 LE + BOM</td>
+        <td>用默认 UTF-8 写入会直接创建失败，报错信息还很含糊</td>
+        <td>统一用 <code>new UnicodeEncoding(false, true)</code> 写临时文件；或干脆走 COM 路径绕开</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td><strong><code>schtasks /query /fo csv /v</code> 表头随系统语言变化</strong></td>
+        <td>用文本解析做数据源，换语言环境直接崩</td>
+        <td>枚举一律走 COM <code>ITaskService</code> 或 <code>/query /xml</code>，绝不解析本地化文本</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td><strong><code>shutdown /t</code> 上限 315360000 秒（10 年）</strong>，超出直接报错</td>
+        <td>用户输入超长时间时崩溃或静默失败</td>
+        <td>输入层做范围校验并给出明确提示；超长任务改用计划任务而非 <code>/t</code></td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td><strong><code>shutdown /s</code> 不保存未保存的文档</strong></td>
+        <td>数据丢失，是最严重的用户投诉来源</td>
+        <td>默认开启提前提醒；提供「优雅关闭」模式；可选看门狗检测指定进程存在时跳过</td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td><strong>系统时间被手动修改 / 时区变更</strong></td>
+        <td>倒计时错乱或提前触发</td>
+        <td>倒计时用单调时钟（<code>Environment.TickCount64</code>）而非墙钟；绝对时刻任务交给系统计划任务处理</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td><strong><code>msg.exe</code> 在 Win10 家庭版不存在</strong></td>
+        <td>用命令行弹提示的方案在家庭版失效</td>
+        <td>提示一律用自绘 WPF 窗口，不依赖 <code>msg</code></td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td><strong>组策略禁用 <code>shutdown.exe</code></strong>（企业环境常见）</td>
+        <td>所有关机功能失效</td>
+        <td>降级到 P/Invoke：<code>InitiateSystemShutdownEx</code> 或 <code>ExitWindowsEx(EWX_SHUTDOWN \| EWX_FORCE)</code>，启动时探测并自动选择可用通道</td>
+      </tr>
+      <tr>
+        <td>12</td>
+        <td><strong>杀软启发式拦截</strong>：单文件 exe 频繁调用 <code>shutdown.exe</code> 容易被判定为可疑行为</td>
+        <td>误报、隔离、用户不敢用</td>
+        <td>程序不联网、不写系统目录、不上报；提供数字签名（若有条件）；在 README 中说明行为，减少用户疑虑</td>
+      </tr>
+      <tr>
+        <td>13</td>
+        <td><strong>UAC 被用户拒绝</strong></td>
+        <td>任务保存失败但草稿丢失，用户白填一遍表单</td>
+        <td>提权失败时保留草稿并友好提示，提供「以内存计时方式临时执行」的降级选项</td>
+      </tr>
+      <tr>
+        <td>14</td>
+        <td><strong>任务被用户手动在系统计划程序里改坏</strong></td>
+        <td>软件读取到非预期状态</td>
+        <td>读取时做健壮性校验，无法解析的任务在列表中标记为「外部修改」并允许一键修复或清理</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="s8">
+  <h2><span class="num">8</span>里程碑与验收标准</h2>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>阶段</th><th>交付内容</th><th>验收标准</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>M1 · 骨架</strong></td>
+        <td>WPF 工程、主窗口列表、任务数据模型、本地 JSON 持久化、PowerActionExecutor（关机/重启/睡眠/休眠）</td>
+        <td>能创建一条「30 分钟后关机」的倒计时任务，到点准确执行，可在提醒窗中取消</td>
+      </tr>
+      <tr>
+        <td><strong>M2 · 持久化</strong></td>
+        <td>SchedulerEngine（COM 实现）、提权辅助、任务 CRUD 全链路、启用/停用开关</td>
+        <td>创建的「每天 23:00 关机」任务在关闭软件、重启系统后依然存在并按期执行；任务计划程序中可见于 <code>\PlanPower</code> 文件夹</td>
+      </tr>
+      <tr>
+        <td><strong>M3 · 体验</strong></td>
+        <td>三步向导 + 自然语言预览、倒计时悬浮窗、托盘菜单、执行日志、任务模板、导入导出</td>
+        <td>新用户不看文档能在 60 秒内创建第一条任务；托盘右键能一键「60 分钟后关机」</td>
+      </tr>
+      <tr>
+        <td><strong>M4 · 进阶</strong></td>
+        <td>唤醒执行、空闲触发、电池感知、收尾动作流水线、看门狗、命令行接口</td>
+        <td>休眠中的电脑能被定时唤醒并执行任务；<code>powercfg /waketimers</code> 中能看到注册的唤醒定时器</td>
+      </tr>
+      <tr>
+        <td><strong>M5 · 打磨</strong></td>
+        <td>深色模式、高 DPI 适配、多语言、便携模式、错误上报与自诊断</td>
+        <td>在 100% / 125% / 150% 缩放下界面无模糊错位；全流程无未捕获异常</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note ok">
+    <p><b>最小可用版本（MVP）建议范围：</b>M1 + M2 + M3 中的「向导 + 托盘」。即：<b>能创建、编辑、删除、启停任务；任务能跨重启存活；有提前提醒可取消；有托盘快捷操作。</b>这已经能覆盖 80% 的真实使用场景，也足以与现有开源同类软件形成差异化。</p>
+  </div>
+</section>
+
+<footer>
+  <p><b>PlanPower · Windows 定时电源管理器 设计方案</b>　|　生成日期 2026-10-12</p>
+  <p class="src">参考的开源项目：
+    <a href="https://github.com/lukaslangrock/ShutdownTimerClassic">lukaslangrock/ShutdownTimerClassic</a> ·
+    <a href="https://github.com/smilefate/Chronoff">smilefate/Chronoff</a> ·
+    <a href="https://github.com/yingming006/ShutdownTool">yingming006/ShutdownTool</a> ·
+    <a href="https://github.com/athosAnd/WinShutdownTool">athosAnd/WinShutdownTool</a> ·
+    <a href="https://github.com/bluehints/scheduled-shutdown">bluehints/scheduled-shutdown</a> ·
+    <a href="https://www.everauto.net/cn/">zTasker</a>
+  </p>
+</footer>
+
+</div>
+</body>
+</html>

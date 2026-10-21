@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlanPower · 系统级持久任务设计</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff;
+    --ink:#1f2937; --ink-2:#4b5563; --ink-3:#6b7280;
+    --line:#e5e7eb; --line-2:#eef0f3;
+    --brand:#2563eb; --brand-soft:#eff4ff;
+    --teal:#0d9488; --teal-soft:#effaf8;
+    --amber:#b45309; --amber-soft:#fff8ec;
+    --red:#b91c1c; --red-soft:#fef2f2;
+    --violet:#6d28d9; --violet-soft:#f5f3ff;
+    --radius:10px;
+    --mono:"SF Mono",Menlo,Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 80px;}
+
+  .hero{background:linear-gradient(135deg,#4c1d95 0%,#6d28d9 45%,#2563eb 100%);
+    color:#fff;padding:56px 24px 48px;margin-bottom:36px;}
+  .hero-inner{max-width:1080px;margin:0 auto;}
+  .hero .tag{display:inline-block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);
+    padding:5px 12px;border-radius:999px;margin-bottom:18px;}
+  .hero h1{margin:0 0 10px;font-size:33px;line-height:1.3;font-weight:700;letter-spacing:-.01em;}
+  .hero p.sub{margin:0;font-size:16px;color:rgba(255,255,255,.9);max-width:790px;}
+  .hero .meta{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px;}
+  .hero .meta span{font-size:12.5px;background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.22);border-radius:6px;padding:5px 11px;}
+
+  section{margin-bottom:44px;}
+  h2{font-size:22px;margin:0 0 6px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:10px;}
+  h2 .num{flex:none;width:30px;height:30px;border-radius:8px;background:var(--violet);color:#fff;
+    font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+  h2 + .lede{color:var(--ink-3);font-size:14px;margin:0 0 20px 40px;}
+  h3{font-size:16.5px;margin:28px 0 10px;font-weight:650;}
+  h4{font-size:14.5px;margin:20px 0 8px;font-weight:650;color:var(--ink-2);}
+  p{margin:0 0 12px;}
+  ul,ol{margin:0 0 14px;padding-left:22px;}
+  li{margin-bottom:5px;}
+  code{font-family:var(--mono);font-size:12.5px;background:#eef2f7;color:#1e3a8a;
+    padding:1.5px 6px;border-radius:4px;white-space:nowrap;}
+  pre{background:#0f172a;color:#e2e8f0;border-radius:var(--radius);padding:16px 18px;
+    overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.65;margin:0 0 16px;}
+  pre code{background:none;color:inherit;padding:0;white-space:pre;}
+  pre .c{color:#7c8ba1;} pre .k{color:#7dd3fc;} pre .s{color:#a5e8b5;}
+  pre .t{color:#fca5a5;} pre .n{color:#fcd34d;}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 24px;margin-bottom:16px;}
+  .card.tight{padding:16px 18px;}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  @media(max-width:820px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:#fff;margin-bottom:18px;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;background:#f8fafc;color:var(--ink-2);font-weight:650;padding:11px 14px;
+    border-bottom:1px solid var(--line);white-space:nowrap;font-size:13px;}
+  td{padding:11px 14px;border-bottom:1px solid var(--line-2);vertical-align:top;color:var(--ink-2);}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#fafbfc;}
+  td strong{color:var(--ink);font-weight:600;}
+  td code{white-space:normal;}
+  .yes{color:#0d9488;font-weight:700;}
+  .no{color:#dc2626;font-weight:700;}
+  .mid{color:#b45309;font-weight:700;}
+
+  .b{display:inline-block;font-size:11.5px;font-weight:650;padding:2px 8px;border-radius:5px;white-space:nowrap;}
+  .b-p0{background:var(--red-soft);color:var(--red);border:1px solid #fecaca;}
+  .b-p1{background:var(--amber-soft);color:var(--amber);border:1px solid #fde68a;}
+  .b-p2{background:var(--brand-soft);color:var(--brand);border:1px solid #bfdbfe;}
+  .b-new{background:var(--teal-soft);color:var(--teal);border:1px solid #99f6e4;}
+  .b-tag{background:#f1f5f9;color:var(--ink-3);border:1px solid var(--line);}
+  .b-vio{background:var(--violet-soft);color:var(--violet);border:1px solid #ddd6fe;}
+
+  .note{border-left:3px solid var(--brand);background:var(--brand-soft);
+    border-radius:0 var(--radius) var(--radius) 0;padding:13px 18px;margin:0 0 16px;font-size:14px;}
+  .note.warn{border-left-color:#f59e0b;background:var(--amber-soft);}
+  .note.danger{border-left-color:#dc2626;background:var(--red-soft);}
+  .note.ok{border-left-color:var(--teal);background:var(--teal-soft);}
+  .note.vio{border-left-color:var(--violet);background:var(--violet-soft);}
+  .note b{color:var(--ink);}
+  .note p:last-child{margin-bottom:0;}
+
+  .diagram{background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;margin-bottom:18px;overflow-x:auto;}
+
+  .toc{background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 22px;margin-bottom:36px;}
+  .toc h4{margin:0 0 10px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);}
+  .toc ol{margin:0;padding-left:0;list-style:none;counter-reset:t;
+    display:grid;grid-template-columns:1fr 1fr;gap:4px 26px;}
+  @media(max-width:820px){.toc ol{grid-template-columns:1fr;}}
+  .toc li{counter-increment:t;font-size:14px;margin:0;padding:3px 0;}
+  .toc li::before{content:counter(t) ". ";color:var(--violet);font-weight:650;}
+  .toc a{color:var(--ink);text-decoration:none;border-bottom:1px solid transparent;}
+  .toc a:hover{border-bottom-color:var(--violet);color:var(--violet);}
+
+  /* 对话框模拟 */
+  .dlg{background:#fff;border:1px solid #d8dee8;border-radius:12px;overflow:hidden;
+    box-shadow:0 10px 34px rgba(23,42,80,.13);max-width:560px;margin:0 auto 18px;}
+  .dlg .dh{padding:15px 20px 12px;font-size:15px;font-weight:700;border-bottom:1px solid var(--line-2);}
+  .dlg .db{padding:18px 20px;font-size:13.5px;color:var(--ink-2);line-height:1.7;}
+  .dlg .db ul{margin:8px 0 12px;padding-left:20px;}
+  .dlg .db li{margin-bottom:6px;}
+  .dlg .df{padding:13px 20px;background:#fafbfc;border-top:1px solid var(--line-2);
+    display:flex;gap:9px;align-items:center;}
+  .dlg .df .sp{flex:1;}
+  .dbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 15px;
+    font-size:13.5px;color:var(--ink-2);font-family:inherit;cursor:pointer;}
+  .dbtn.pri{background:var(--violet);border-color:var(--violet);color:#fff;font-weight:600;}
+  .dbtn.dis{opacity:.45;cursor:not-allowed;}
+  .ack{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-2);
+    background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px 13px;margin-bottom:4px;}
+  .ack .cb{width:17px;height:17px;border-radius:4px;border:1.5px solid #cbd5e1;flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;background:#fff;}
+  .ack .cb.on{background:var(--violet);border-color:var(--violet);}
+
+  .chk{list-style:none;padding-left:0;}
+  .chk li{position:relative;padding-left:30px;margin-bottom:8px;font-size:14px;color:var(--ink-2);}
+  .chk li::before{content:"";position:absolute;left:0;top:4px;width:17px;height:17px;
+    border-radius:5px;border:1.5px solid #cbd5e1;background:#fff;}
+  .chk li b{color:var(--ink);}
+
+  footer{border-top:1px solid var(--line);padding-top:22px;margin-top:44px;font-size:13px;color:var(--ink-3);}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-inner">
+    <span class="tag">专项设计 · 便携版关键矛盾拆解</span>
+    <h1>系统级持久任务：显式可选 + 可一键清理</h1>
+    <p class="sub">「任务要能跨重启存活」与「程序不留痕」是便携软件绕不开的一对矛盾。这份文档把这对矛盾的解法完整拆开：默认不持久、开启需显式同意、写入可完整回收、并且随时能看到自己在这台机器上留了什么。</p>
+    <div class="meta">
+      <span>默认关闭</span>
+      <span>显式同意后启用</span>
+      <span>三级清理入口</span>
+      <span>归属机器识别</span>
+      <span>孤儿任务检测</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<div class="note vio" style="margin-bottom:26px">
+  <p><b>本设计解决的问题：</b>PlanPower 是便携软件，运行在别人的机器上、跑在 U 盘里。但「每天 23:00 关机」这类需求天生要求任务能跨重启存活——而唯一可靠的实现方式是写入 Windows 任务计划程序，这会<strong>在宿主机器上留下痕迹</strong>。</p>
+  <p>如果不管：U 盘拔走后，那台机器上还挂着一堆不知道从哪来的关机任务，用户无法解释也无法清理，这是不可接受的。如果一刀切禁用：产品就退化成普通倒计时小工具，丢掉最核心的差异化。</p>
+  <p>所以答案是第三条路：<b>把它做成一个需要显式同意、且可完整回收的可选能力。</b></p>
+</div>
+
+<div class="note ok" style="margin-bottom:26px">
+  <p><b>实现状态（v0.2.2）：已按本文落地。</b>三道闸门、三级清理、归属识别、动作兼容性矩阵、提权助手与命令行应急清理均已写进代码并通过离线验证。</p>
+  <p><b>落地时补充的一条约束：</b>系统持久任务<strong>不进入内存计时器</strong>——它的执行者是 Windows，本程序不参与计时。早期实现两边都排，结果内存这条到点用 <code>timeout=0</code> 立刻执行，把 <code>shutdown.exe /t N</code> 争来的宽限窗口当场掐掉，提醒窗上的「取消本次」也变成谎话（取消了内存这条，系统那条照样执行）。现在改为：系统任务由任务计划程序全权负责，界面用它推算出的「下次执行」时刻来展示，只当计划看，不当进度看。</p>
+  <p><b>另一条落地时收紧的口径：</b>失败路径做成原子的。降级（系统 → 内存）时先摘系统任务再写盘，摘不掉就整体中止保存；删除系统任务失败时不删本地记录。否则会留下一条界面上看不见、后台却照常执行的任务——用户连从哪儿关掉都找不到。</p>
+  <p><b>v0.2.2 补的一条：注册本身也要有退路。</b>真机上服务端以 <code>SCHED_E_INVALIDVALUE</code>（<code>0x80041318</code>，「任务 XML 包含一个格式不正确或超出范围的值」）整段拒绝了任务定义。这个错误名下的约束有一部分文档里没写、只能实测，无法在开发机上复现。于是把定义拆成<strong>完整版</strong>与<strong>精简版</strong>两套，按「定义风格 × 版本 × 身份写法」的顺序降级重试（详见 README 的 v0.2.2 修复记录）。<b>关键约束是降级不许改坏行为</b>：精简版可以省掉与默认值等价的冗余项，但「不因电池而跳过」「错过补跑」「唤醒执行」「启停状态」「执行时限」这五项必须两套都有——把用户从「注册失败」换成「注册成一条行为不对的任务」，比直接失败更糟。</p>
+</div>
+
+<div class="note warn" style="margin-bottom:26px">
+  <p><b>v0.2.1 修复：真机反馈「选择系统持久任务时，保存提示『注册系统任务失败』」。</b></p>
+  <p><b>主因不在任务计划程序，而在配置文件的写入方式。</b>当时用 kernel32 的 <code>WritePrivateProfileString</code> 存配置——它写的是<strong>进程内缓存</strong>，延迟落盘，全程没有 flush。而「注册系统任务」这一步是父进程保存完立刻 <code>ShellExecuteEx(runas)</code> 拉起提权助手去做的，助手从<strong>磁盘</strong>读 INI，读到的要么是旧内容、要么文件还不存在，于是按任务 ID 查不到任务。偏偏 <code>SchedDoAdd</code> 的所有失败分支共用同一个标题，<strong>「找不到任务」被伪装成了「注册系统任务失败」</strong>。</p>
+  <p><b>次因：</b><code>RegistrationInfo</code> 里手写的 <code>&lt;URI&gt;\PlanPower\xxx&lt;/URI&gt;</code>。任务路径本来就由 <code>RegisterTaskDefinition</code> 的第一个参数决定、服务端自己推导；手写一个以反斜杠开头的 URI，一旦与注册路径有任何出入就以 <code>0x80041318</code>（XML 取值非法）被整段拒绝，而报错完全指不到这个元素上。已删除。</p>
+  <p><b>修法：</b>① 配置读写改为自己实现——整段拼好后写临时文件 → <code>FlushFileBuffers</code> → <code>MoveFileExW</code> 原子替换，彻底弃用 Profile API；② 注册拆成 <code>put_XmlText</code>（只验 XML 合法性）与 <code>RegisterTaskDefinition</code>（验权限 / 路径 / 身份）两步，两阶段失败文案不同；③ 错误说明改为「十六进制错误码 + <code>FormatMessageW</code> 取系统自带中文说明」，不再硬编码错误码表；④ 「找不到任务」时一并报出配置文件路径与读到的任务条数。</p>
+  <p><b>顺带发现：</b>给宿主测试加 <code>-I src</code> 会让 libc++ 内部的 <code>#include &lt;sched.h&gt;</code> 命中项目里的 <code>src/sched.h</code>，把 <code>core.h</code> → <code>&lt;vector&gt;</code> 拖进一个正在展开的 <code>&lt;vector&gt;</code>，报出一堆莫名的 <code>no member named 'min'</code>。改用 <code>-iquote src</code>（只作用于引号形式的包含）。</p>
+  <p><b>回归防护：</b>新增 <code>tools/initest.cpp</code>（112 项 INI 往返断言）与 <code>tools/check_layout.py</code> 的 E 组跨文件不变量（14 条，锁住上述每一条修法）。11 类手工注入的回归全部被准确捕获。</p>
+</div>
+
+<div class="toc">
+  <h4>目录</h4>
+  <ol>
+    <li><a href="#s1">设计原则</a></li>
+    <li><a href="#s2">任务状态模型</a></li>
+    <li><a href="#s3">交互设计：三道闸门</a></li>
+    <li><a href="#s4">归属识别：知道任务是谁留下的</a></li>
+    <li><a href="#s5">三级清理入口</a></li>
+    <li><a href="#s6">动作兼容性矩阵</a></li>
+    <li><a href="#s7">异常场景处理</a></li>
+    <li><a href="#s8">技术实现要点</a></li>
+    <li><a href="#s9">验收标准</a></li>
+  </ol>
+</div>
+
+<!-- ===== 1 ===== -->
+<section id="s1">
+  <h2><span class="num">1</span>设计原则</h2>
+  <p class="lede">四条原则决定了后面所有的具体设计。</p>
+
+  <div class="grid-2">
+    <div class="card tight">
+      <h4 style="margin-top:0">① 默认不持久</h4>
+      <p style="margin:0;font-size:13.5px">便携是主场景，持久是可选增强。新装即用状态下，程序<strong>一个字节都不往宿主机写</strong>。用户不主动开启，就永远不会产生残留。</p>
+    </div>
+    <div class="card tight">
+      <h4 style="margin-top:0">② 显式同意</h4>
+      <p style="margin:0;font-size:13.5px">开启时必须说清楚三件事：会写什么、写在哪、怎么清理。用户勾选确认后才生效。不做静默升级，不做「默认帮你勾上」。</p>
+    </div>
+    <div class="card tight">
+      <h4 style="margin-top:0">③ 可逆</h4>
+      <p style="margin:0;font-size:13.5px">任何写入都必须有对应的删除路径，且删除路径不依赖原配置文件——即使 INI 丢了、U 盘换了，也必须能清干净。</p>
+    </div>
+    <div class="card tight">
+      <h4 style="margin-top:0">④ 可发现</h4>
+      <p style="margin:0;font-size:13.5px">用户随时能看到「我在这台机器上留了什么」。状态栏常驻显示已注册的系统任务数量，一键直达清理入口。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 2 ===== -->
+<section id="s2">
+  <h2><span class="num">2</span>任务状态模型</h2>
+  <p class="lede">要管好这些任务，先得把「任务可能处于哪些状态」定义清楚。</p>
+
+  <h3>2.1 两个正交维度</h3>
+  <p>每个任务由两个维度共同描述：</p>
+  <ul>
+    <li><strong>引擎维度</strong>：由谁执行 —— <span class="b b-tag">内存</span> 内存计时器（PlanPower 自己执行）／ <span class="b b-vio">系统</span> 任务计划程序（由 Windows 执行）</li>
+    <li><strong>归属维度</strong>：这条记录属于哪台机器 —— 本机／其他机器（配置随 U 盘带过来的）</li>
+  </ul>
+
+  <h3>2.2 完整状态表</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>引擎</th><th>系统里实际存在？</th><th>归属</th><th>界面显示</th><th>用户可做的操作</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="b b-tag">内存</span></td>
+        <td>—（不涉及）</td>
+        <td>本配置</td>
+        <td>正常显示，标注「内存计时 · 退出后失效」</td>
+        <td>编辑 / 启停 / 删除 / 立即执行</td>
+      </tr>
+      <tr>
+        <td><span class="b b-vio">系统</span></td>
+        <td class="yes">是，且内容匹配</td>
+        <td>本机</td>
+        <td>正常显示，标注「系统任务 · 已注册于本机」</td>
+        <td>全部操作</td>
+      </tr>
+      <tr>
+        <td><span class="b b-vio">系统</span></td>
+        <td class="no">否（配置说应该有）</td>
+        <td>本机</td>
+        <td><span class="b b-p1">已失效</span> 灰显，附「重新注册」按钮</td>
+        <td>重新注册 / 转为内存任务 / 删除</td>
+      </tr>
+      <tr>
+        <td><span class="b b-vio">系统</span></td>
+        <td class="mid">是，但内容被改过</td>
+        <td>本机</td>
+        <td><span class="b b-p1">外部修改</span> 提示内容与配置不一致</td>
+        <td>用配置覆盖 / 采纳系统版本 / 删除</td>
+      </tr>
+      <tr>
+        <td><span class="b b-vio">系统</span></td>
+        <td class="yes">是</td>
+        <td class="mid">其他机器</td>
+        <td>显示「注册于 DESKTOP-ABC」，本机不可编辑</td>
+        <td>在本机重新注册 / 仅从配置移除</td>
+      </tr>
+      <tr>
+        <td><span class="b b-vio">系统</span></td>
+        <td class="yes">是，但配置里没有</td>
+        <td class="mid">未知（孤儿）</td>
+        <td>不出现在任务列表，只在清理向导中提示</td>
+        <td>清理向导中一并删除</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <p><b>「孤儿任务」是最需要处理好的情况。</b>它指的是：<code>\PlanPower</code> 文件夹里存在某个计划任务，但当前配置文件里没有对应记录。产生原因通常是——用户把 INI 删了、换了台机器、或者上一次注册后 U 盘丢失。这些任务必须能被发现和清理，否则就成了永久残留。</p>
+  </div>
+</section>
+
+<!-- ===== 3 ===== -->
+<section id="s3">
+  <h2><span class="num">3</span>交互设计：三道闸门</h2>
+  <p class="lede">从「默认不持久」到「真的写入系统」，用户需要主动跨过三道门槛。每一道都让代价更清楚。</p>
+
+  <h3>第一道闸门 · 全局能力开关</h3>
+  <p>位于设置页，名为「允许创建系统级持久任务」，<strong>默认关闭</strong>。首次开启时弹出说明对话框：</p>
+
+  <div class="dlg">
+    <div class="dh">启用系统级持久任务？</div>
+    <div class="db">
+      开启后，你可以把任务注册到本机的 Windows 任务计划程序中。这样做的好处是：
+      <ul>
+        <li>即使 PlanPower 未运行，任务依然会按时执行</li>
+        <li>即使电脑重启过，任务依然有效</li>
+        <li>任务可以唤醒处于睡眠或休眠状态的电脑</li>
+      </ul>
+      需要了解的代价：
+      <ul>
+        <li>会在本机任务计划程序的 <code>\PlanPower</code> 文件夹下留下记录</li>
+        <li>需要管理员权限（每次注册会弹出 UAC 确认）</li>
+        <li><strong>离开这台电脑前，请使用「清理全部系统任务」</strong></li>
+      </ul>
+      <div class="ack"><span class="cb on">✓</span><span>我已了解，并会在离开本机前清理</span></div>
+    </div>
+    <div class="df">
+      <div class="sp"></div>
+      <button class="dbtn">取消</button>
+      <button class="dbtn pri">启用</button>
+    </div>
+  </div>
+
+  <p style="font-size:13.5px;color:var(--ink-3);text-align:center;margin-bottom:22px">「启用」按钮在勾选确认前为禁用状态，不可跳过。</p>
+
+  <h3>第二道闸门 · 任务级选择</h3>
+  <p>创建向导第 3 步新增「任务类型」选项组，<strong>默认选中「内存计时」</strong>：</p>
+
+  <div class="grid-2">
+    <div class="card tight" style="border-color:#99f6e4;background:#f7fefc">
+      <h4 style="margin-top:0;color:#0f766e">⚡ 内存计时　<span class="b b-new">默认</span></h4>
+      <p style="margin:0 0 8px;font-size:13.5px">立即生效，不需要管理员权限，退出 PlanPower 后失效。</p>
+      <p style="margin:0;font-size:12.5px;color:var(--ink-3)">适合：临时的「30 分钟后关机」「今天 22:00 重启」</p>
+    </div>
+    <div class="card tight" style="border-color:#ddd6fe;background:#fbfaff">
+      <h4 style="margin-top:0;color:#5b21b6">📌 系统持久任务</h4>
+      <p style="margin:0 0 8px;font-size:13.5px">跨重启存活，可唤醒睡眠中的电脑，需要管理员权限，会在本机留下记录。</p>
+      <p style="margin:0;font-size:12.5px;color:var(--ink-3)">适合：长期的「每个工作日 23:00 关机」「每天 08:30 唤醒开机」</p>
+    </div>
+  </div>
+
+  <p>选择「系统持久任务」后，向导底部的预览条追加一行提示：</p>
+  <div class="note warn">
+    <p style="margin:0">「将在本机注册一个系统任务，需要管理员权限。<b>离开本机前记得清理。</b>」</p>
+  </div>
+
+  <h3>第三道闸门 · 每次写入前的 UAC</h3>
+  <p>每次实际写入系统时（创建、修改、删除、启停系统任务），由 Windows 弹出 UAC 确认。这既是系统要求，也是一次自然的「你确定吗」。</p>
+  <div class="note ok">
+    <p><b>为什么不做「一次提权，全程免打扰」？</b>因为那意味着程序长期持有管理员权限，一旦有漏洞影响面更大；而且每次操作都有 UAC 确认，用户对「我正在往系统里写东西」这件事始终有感知。对于一个宣称「便携不留痕」的软件，这种透明性比便利性更重要。</p>
+  </div>
+</section>
+
+<!-- ===== 4 ===== -->
+<section id="s4">
+  <h2><span class="num">4</span>归属识别：知道任务是谁留下的</h2>
+  <p class="lede">U 盘会插到很多台机器上。配置跟着盘走，但系统任务留在各台机器里。必须能区分「这条任务是在本机注册的」还是「在别的机器上注册的」。</p>
+
+  <h3>4.1 机器指纹</h3>
+  <p>在不写注册表的前提下，用两个稳定标识组合出机器指纹：</p>
+  <pre><code><span class="c">// 取计算机名 + 系统盘卷序列号，哈希后取 8 位十六进制</span>
+<span class="k">wchar_t</span> computerName[MAX_COMPUTERNAME_LENGTH + <span class="n">1</span>];
+DWORD size = MAX_COMPUTERNAME_LENGTH + <span class="n">1</span>;
+GetComputerNameW(computerName, &amp;size);
+
+<span class="k">wchar_t</span> sysRoot[MAX_PATH];
+GetWindowsDirectoryW(sysRoot, MAX_PATH);
+sysRoot[<span class="n">3</span>] = L<span class="s">'\0'</span>;                 <span class="c">// "C:\"</span>
+
+DWORD volumeSerial = <span class="n">0</span>;
+GetVolumeInformationW(sysRoot, <span class="k">nullptr</span>, <span class="n">0</span>, &amp;volumeSerial,
+                      <span class="k">nullptr</span>, <span class="k">nullptr</span>, <span class="k">nullptr</span>, <span class="n">0</span>);
+
+<span class="c">// 组合 + 哈希（自实现的 FNV-1a，约 10 行）→ 例如 "7F3A9C21"</span></code></pre>
+
+  <h3>4.2 归属记录（写在 INI 里，随 U 盘走）</h3>
+  <pre><code><span class="c">; PlanPower.ini —— 记录"我在这台机器上留了什么"</span>
+[Host.7F3A9C21]
+name=DESKTOP-ABC
+lastseen=2026-10-12T21:15:00
+tasks=\PlanPower\工作日下班关机_a1b2c3d4,\PlanPower\早晨唤醒_e5f6a7b8
+
+[Host.2B8E4D10]
+name=LAPTOP-XYZ
+lastseen=2026-10-05T09:30:00
+tasks=\PlanPower\临时关机_c9d0e1f2</code></pre>
+
+  <p>启动时，程序用当前机器的指纹去查这个表：</p>
+  <ul>
+    <li><strong>命中</strong> → 这些系统任务属于本机，正常显示、可编辑、可清理</li>
+    <li><strong>未命中但表里有其他机器</strong> → 那些任务显示为「注册于 DESKTOP-ABC」，本机不可编辑，只提供「在本机重新注册」</li>
+    <li><strong>本机指纹不在表里，但系统里发现了 <code>\PlanPower</code> 任务</strong> → 判定为孤儿，提示清理</li>
+  </ul>
+
+  <div class="note warn">
+    <p><b>这个表可能失效。</b>如果用户删了 INI、或者 U 盘丢了，归属信息就没了。所以归属表只是「优化项」，<strong>真正的兜底是任务名里的 PlanPower 前缀和 <code>\PlanPower</code> 文件夹</strong>——只要看到这个文件夹，就知道是本程序留下的，可以清。这也正是下一节「应急清理入口」存在的理由。</p>
+  </div>
+</section>
+
+<!-- ===== 5 ===== -->
+<section id="s5">
+  <h2><span class="num">5</span>三级清理入口</h2>
+  <p class="lede">按「粒度从细到粗、依赖从多到少」排列。最关键的是第三级——它不依赖任何本地数据。</p>
+
+  <h3>第一级 · 任务级</h3>
+  <p>删除单个系统任务时，同步删除对应的计划任务。用户不需要额外操作，也不会留下半截记录。</p>
+  <p><strong>失败处理：</strong>如果 UAC 被拒绝或删除失败，该任务在列表中被标记为「待清理」，并保留在配置中，下次启动时再次提醒。</p>
+
+  <h3>第二级 · 机器级（主入口）</h3>
+  <p>设置页与状态栏各有一个入口：<strong>「清理本机全部系统任务」</strong>。点击后进入清理向导：</p>
+
+  <div class="diagram">
+  <svg viewBox="0 0 1000 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:800px;">
+    <defs>
+      <marker id="ar3" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+        <path d="M0,0 L9,4.5 L0,9 z" fill="#94a3b8"/>
+      </marker>
+    </defs>
+
+    <rect x="30" y="16" width="270" height="52" rx="9" fill="#eff4ff" stroke="#bfdbfe"/>
+    <text x="165" y="38" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="600" fill="#1e3a8a">① 枚举 \PlanPower 文件夹</text>
+    <text x="165" y="56" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#3b5bdb">ITaskService::GetFolder + IEnumWorkItems</text>
+
+    <line x1="300" y1="42" x2="352" y2="42" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar3)"/>
+
+    <rect x="354" y="16" width="290" height="52" rx="9" fill="#fff8ec" stroke="#fde68a"/>
+    <text x="499" y="38" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="600" fill="#92400e">② 与本地配置比对，分类</text>
+    <text x="499" y="56" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#b45309">匹配 / 孤儿 / 其他机器 / 外部修改</text>
+
+    <line x1="644" y1="42" x2="696" y2="42" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar3)"/>
+
+    <rect x="698" y="16" width="272" height="52" rx="9" fill="#f5f3ff" stroke="#ddd6fe"/>
+    <text x="834" y="38" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="600" fill="#5b21b6">③ 展示清单，用户勾选确认</text>
+    <text x="834" y="56" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#6d28d9">默认全选，孤儿单独分组提示</text>
+
+    <line x1="834" y1="68" x2="834" y2="104" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar3)"/>
+
+    <rect x="698" y="106" width="272" height="52" rx="9" fill="#fff"/>
+    <rect x="698" y="106" width="272" height="52" rx="9" fill="none" stroke="#e5e7eb"/>
+    <text x="834" y="128" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="600" fill="#374151">④ 一次 UAC 提权</text>
+    <text x="834" y="146" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#6b7280">批量删除，避免逐条弹窗</text>
+
+    <line x1="698" y1="132" x2="646" y2="132" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar3)"/>
+
+    <rect x="354" y="106" width="290" height="52" rx="9" fill="#effaf8" stroke="#99f6e4"/>
+    <text x="499" y="128" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="600" fill="#0f766e">⑤ 逐条删除 + 记录结果</text>
+    <text x="499" y="146" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#0d9488">成功 / 失败分别统计，失败项保留待重试</text>
+
+    <line x1="354" y1="132" x2="302" y2="132" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar3)"/>
+
+    <rect x="30" y="106" width="270" height="52" rx="9" fill="#effaf8" stroke="#99f6e4"/>
+    <text x="165" y="128" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="600" fill="#0f766e">⑥ 删除空的 \PlanPower 文件夹</text>
+    <text x="165" y="146" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#0d9488">仅当文件夹为空时才删</text>
+
+    <line x1="165" y1="158" x2="165" y2="194" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar3)"/>
+
+    <rect x="30" y="196" width="270" height="52" rx="9" fill="#f5f3ff" stroke="#ddd6fe"/>
+    <text x="165" y="218" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="600" fill="#5b21b6">⑦ 更新 INI 归属表</text>
+    <text x="165" y="236" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#6d28d9">移除本机条目</text>
+
+    <line x1="300" y1="222" x2="352" y2="222" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ar3)"/>
+
+    <rect x="354" y="196" width="290" height="52" rx="9" fill="#fff8ec" stroke="#fde68a"/>
+    <text x="499" y="218" text-anchor="middle" font-family="sans-serif" font-size="12.5" font-weight="600" fill="#92400e">⑧ 输出结果摘要</text>
+    <text x="499" y="236" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#b45309">已清理 N 条 · 失败 M 条（附原因）</text>
+
+    <!-- 应急分支 -->
+    <rect x="30" y="300" width="940" height="76" rx="9" fill="#fef2f2" stroke="#fecaca"/>
+    <text x="50" y="324" font-family="sans-serif" font-size="13" font-weight="700" fill="#991b1b">第三级 · 应急清理（不依赖任何本地数据）</text>
+    <text x="50" y="346" font-family="sans-serif" font-size="12.5" fill="#b91c1c">命令行执行：PlanPower.exe /cleanup-all　→　直接枚举 \PlanPower 文件夹下的全部任务并删除，无论配置里有没有记录</text>
+    <text x="50" y="365" font-family="sans-serif" font-size="12" fill="#dc2626">适用场景：INI 丢失 / U 盘换了 / 换了新电脑想彻底清干净 / 排查残留</text>
+  </svg>
+  </div>
+
+  <h3>第三级 · 应急（关键兜底）</h3>
+  <div class="note danger">
+    <p><b>为什么必须有这一级：</b>归属表和配置文件都可能丢失。用户可能在几个月后换了一台电脑，想起「以前用 U 盘在旧电脑上设过关机任务」，但此时既没有 INI，也没有原始 U 盘。如果清理能力依赖本地数据，这种情况就永远清不掉了。</p>
+    <p>所以必须提供一个<strong>只依赖「任务名前缀 + 文件夹名」</strong>的清理命令，它不读任何配置文件，直接把 <code>\PlanPower</code> 文件夹连根拔起。</p>
+  </div>
+
+  <pre><code><span class="c">:: 清理本机全部 PlanPower 系统任务（不依赖配置文件）</span>
+PlanPower.exe <span class="n">/cleanup-all</span>
+
+<span class="c">:: 先预览将要删除的内容，不做实际删除</span>
+PlanPower.exe /cleanup-all <span class="n">/dry-run</span>
+
+<span class="c">:: 输出示例</span>
+<span class="c">::   发现 3 个系统任务：</span>
+<span class="c">::     \PlanPower\工作日下班关机_a1b2c3d4   关机  下次 今天 23:00</span>
+<span class="c">::     \PlanPower\早晨唤醒_e5f6a7b8         开机  下次 明天 08:30</span>
+<span class="c">::     \PlanPower\临时关机_c9d0e1f2         关机  已失效</span>
+<span class="c">::   已删除 3 个任务，\PlanPower 文件夹已移除。</span></code></pre>
+
+  <h3>补充 · 退出时自动清理</h3>
+  <p>设置项，默认关闭。文案需要写清楚它和「持久」是互斥的：</p>
+  <div class="card tight">
+    <div style="display:flex;align-items:flex-start;gap:12px">
+      <div class="ack" style="margin:0;padding:0;border:none;background:none"><span class="cb on">✓</span></div>
+      <div>
+        <div style="font-size:14px;font-weight:600">退出时自动清理本机系统任务</div>
+        <div style="font-size:12.5px;color:var(--ink-3);margin-top:2px">
+          适合在<b>别人的电脑上临时使用</b>：用完即走，不留痕迹。<br>
+          注意：开启后系统任务只在本次运行期间有效，<b>「跨重启存活」将不再生效</b>。
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 6 ===== -->
+<section id="s6">
+  <h2><span class="num">6</span>动作兼容性矩阵</h2>
+  <p class="lede">不是所有动作都能做成系统持久任务——任务计划程序的动作只能是「启动一个 exe」，而 Windows 并不为每种动作都提供了现成命令。</p>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>动作</th><th>内存计时</th><th>系统持久任务</th><th>系统任务实际调用的命令</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><strong>关机</strong></td><td class="yes">✅</td><td class="yes">✅</td><td><code>shutdown.exe /s /t N /c "提示"</code></td><td>系统自带倒计时提示框</td></tr>
+      <tr><td><strong>重启</strong></td><td class="yes">✅</td><td class="yes">✅</td><td><code>shutdown.exe /r /t N /c "提示"</code></td><td>同上</td></tr>
+      <tr><td><strong>休眠</strong></td><td class="yes">✅</td><td class="yes">✅</td><td><code>shutdown.exe /h</code></td><td>需系统已启用休眠</td></tr>
+      <tr><td><strong>注销</strong></td><td class="yes">✅</td><td class="yes">✅</td><td><code>shutdown.exe /l</code></td><td>—</td></tr>
+      <tr><td><strong>睡眠</strong></td><td class="yes">✅</td><td class="yes">✅</td><td><code>rundll32.exe powrprof.dll,SetSuspendState 0,1,0</code></td><td>注意休眠陷阱</td></tr>
+      <tr><td><strong>锁定工作站</strong></td><td class="yes">✅</td><td class="yes">✅</td><td><code>rundll32.exe user32.dll,LockWorkStation</code></td><td>—</td></tr>
+      <tr><td><strong>关闭显示器</strong></td><td class="yes">✅</td><td class="no">⚠️ 不支持</td><td>无对应系统命令</td><td>只能用窗口消息广播，无独立 exe 可调</td></tr>
+      <tr><td><strong>关机前收尾动作</strong></td><td class="yes">✅</td><td class="no">⚠️ 不支持</td><td>需 PlanPower 自身执行</td><td>见下方说明</td></tr>
+      <tr><td><strong>看门狗（有未保存工作则跳过）</strong></td><td class="yes">✅</td><td class="no">⚠️ 不支持</td><td>需 PlanPower 自身执行</td><td>见下方说明</td></tr>
+      <tr><td><strong>局域网关机</strong></td><td class="yes">✅</td><td class="yes">✅</td><td><code>shutdown.exe /m \\计算机名 /s</code></td><td>需目标机凭据</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note warn">
+    <p><b>关于「⚠️ 不支持」的处理方式：</b>这三种能力需要 PlanPower 自己运行才能实现，而系统任务的动作必须指向一个固定的 exe 路径——U 盘盘符会变，指向 U 盘上的 exe 不可靠。</p>
+    <p>方案：在向导中<strong>直接禁用</strong>这些组合。当用户为任务勾选了「收尾动作」或「看门狗」，任务类型自动锁定为「内存计时」，并给出说明：「收尾动作需要 PlanPower 运行才能执行，因此该任务无法注册为系统持久任务。」</p>
+    <p>不做「静默降级」——让用户明确知道限制在哪，比事后发现「为什么我的收尾脚本没跑」要好得多。</p>
+  </div>
+
+  <h3>进阶选项 · 驻留副本（可选，默认不启用）</h3>
+  <p>如果确实需要让「收尾动作」类任务也持久化，提供一个明确的进阶开关：</p>
+  <div class="card tight">
+    <h4 style="margin-top:0">把 PlanPower 部署到本机</h4>
+    <p style="font-size:13.5px;margin-bottom:8px">把 <code>PlanPower.exe</code> 复制到 <code>%LOCALAPPDATA%\PlanPower\</code>，系统任务指向这个副本。这样高级动作也能持久化，代价是：</p>
+    <ul style="font-size:13.5px;margin-bottom:0">
+      <li>本机会多出一个约 300 KB 的文件</li>
+      <li>副本不会自动更新，主程序版本升级后需要重新部署</li>
+      <li>清理时需要一并删除这个副本（清理向导会自动处理）</li>
+    </ul>
+  </div>
+  <p>这个选项藏在「高级」折叠区里，不主动推荐。绝大多数用户不需要它。</p>
+</section>
+
+<!-- ===== 7 ===== -->
+<section id="s7">
+  <h2><span class="num">7</span>异常场景处理</h2>
+  <p class="lede">这些场景在实际使用中一定会遇到，必须提前定义好行为。</p>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>#</th><th>场景</th><th>检测方式</th><th>处理策略</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><strong>UAC 被用户拒绝</strong></td>
+        <td><code>ShellExecuteEx</code> 返回 <code>ERROR_CANCELLED</code>（1223）</td>
+        <td>任务保留为「未注册」状态，配置不丢；界面提示「已取消注册，任务仍以内存计时方式运行」。<b>绝不静默失败。</b></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><strong>配置说注册了，系统里却没有</strong></td>
+        <td>枚举 <code>\PlanPower</code> 后比对</td>
+        <td>标记为「已失效」，提供「重新注册」按钮；若任务本应正在运行，同时在状态栏提示</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><strong>系统里有，配置里没有（孤儿）</strong></td>
+        <td>同上</td>
+        <td>不出现在主列表（避免干扰），但在清理向导中单独分组提示「发现 2 个不属于当前配置的任务，是否一并删除？」</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><strong>任务被用户手动改动</strong></td>
+        <td>比对任务的 XML 内容与配置</td>
+        <td>标记「外部修改」，提供「用配置覆盖」与「采纳系统版本」两个选项，不擅自覆盖</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><strong>U 盘写保护，无法记录归属</strong></td>
+        <td>写 INI 失败</td>
+        <td>注册仍然执行（任务本身有效），但立即弹出警告：「本次注册无法记录到配置，请手动记住并在离开前清理」</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td><strong>清理时部分任务删除失败</strong></td>
+        <td>逐条检查 <code>DeleteTask</code> 返回值</td>
+        <td>失败项写入待清理列表，下次启动时再次提醒；提供失败原因（权限不足 / 任务被占用）</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td><strong>U 盘被拔出，程序仍在运行</strong></td>
+        <td>文件操作返回 <code>ERROR_ACCESS_DENIED</code> / <code>ERROR_NOT_READY</code></td>
+        <td>内存态继续运行至本次会话结束；关键操作立即落盘失败则转为内存态；退出时不报错</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td><strong>同一台机器插了两支不同的 U 盘</strong></td>
+        <td>两份配置各自记录本机指纹下的任务列表</td>
+        <td>各自只管自己注册的任务；清理时按任务名前缀区分（任务名内含 U 盘标识段）</td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td><strong>任务计划程序服务被禁用</strong></td>
+        <td><code>ITaskService::Connect</code> 失败</td>
+        <td>禁用「系统持久任务」选项并说明原因；内存计时功能不受影响</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td><strong>系统任务执行时用户未登录</strong></td>
+        <td>—（预期行为）</td>
+        <td>任务以 <code>LOCAL SYSTEM</code> 身份运行，不依赖登录会话。这正是它比内存计时可靠的原因，在界面上作为卖点说明</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note ok">
+    <p><b>场景 8 的细节设计：</b>为避免两支 U 盘的任务互相误删，任务名中包含一段短标识：<code>\PlanPower\工作日下班关机_{U盘标识}_{任务ID}</code>。清理时只删自己标识的那批。这是「多盘共存」场景下保证安全的必要措施。</p>
+  </div>
+</section>
+
+<!-- ===== 8 ===== -->
+<section id="s8">
+  <h2><span class="num">8</span>技术实现要点</h2>
+
+  <h3>8.1 命名规范</h3>
+  <pre><code><span class="c">// 任务名格式</span>
+\PlanPower\{用户可读名称}_{U盘标识4位}_{任务ID 8位}
+
+<span class="c">// 示例</span>
+\PlanPower\工作日下班关机_a1b2_c3d4e5f6
+\PlanPower\早晨唤醒_a1b2_9f8e7d6c
+
+<span class="c">// 用户可读名称中的非法字符（ \ / : * ? " &lt; &gt; | ）需转义或替换
+// 总长度限制在 200 字符内（任务名上限为 238 字符）</span></code></pre>
+
+  <h3>8.2 通过 COM 创建任务</h3>
+  <pre><code><span class="c">// 连接任务计划程序服务（零第三方依赖，走系统注册的 COM 服务器）</span>
+ITaskService* pService = <span class="k">nullptr</span>;
+CoCreateInstance(CLSID_TaskScheduler, <span class="k">nullptr</span>, CLSCTX_INPROC_SERVER,
+                 IID_ITaskService, (<span class="k">void</span>**)&amp;pService);
+pService-&gt;Connect(_variant_t(), _variant_t(), _variant_t(), _variant_t());
+
+<span class="c">// 打开或创建 \PlanPower 文件夹</span>
+ITaskFolder* pFolder = <span class="k">nullptr</span>;
+pService-&gt;GetFolder(_bstr_t(L<span class="s">"\\PlanPower"</span>), &amp;pFolder);
+<span class="k">if</span> (!pFolder) pService-&gt;GetFolder(_bstr_t(L<span class="s">"\\"</span>), &amp;pRoot),
+               pRoot-&gt;CreateFolder(_bstr_t(L<span class="s">"PlanPower"</span>), _variant_t(), &amp;pFolder);
+
+<span class="c">// 定义任务</span>
+ITaskDefinition* pTask = <span class="k">nullptr</span>;
+pService-&gt;NewTask(<span class="n">0</span>, &amp;pTask);
+
+<span class="c">// 注册信息</span>
+IRegistrationInfo* pReg = <span class="k">nullptr</span>;
+pTask-&gt;get_RegistrationInfo(&amp;pReg);
+pReg-&gt;put_Author(_bstr_t(L<span class="s">"PlanPower (portable)"</span>));
+pReg-&gt;put_Description(_bstr_t(L<span class="s">"由便携版 PlanPower 注册，可用 /cleanup-all 清理"</span>));
+
+<span class="c">// 以 LOCAL SYSTEM 身份运行 —— 无人登录时也生效</span>
+IPrincipal* pPrincipal = <span class="k">nullptr</span>;
+pTask-&gt;get_Principal(&amp;pPrincipal);
+pPrincipal-&gt;put_UserId(_bstr_t(L<span class="s">"S-1-5-18"</span>));
+pPrincipal-&gt;put_LogonType(TASK_LOGON_SERVICE_ACCOUNT);
+pPrincipal-&gt;put_RunLevel(TASK_RUNLEVEL_HIGHEST);
+
+<span class="c">// 关键设置 —— 这三个默认值最坑人，必须显式覆盖</span>
+ITaskSettings* pSet = <span class="k">nullptr</span>;
+pTask-&gt;get_Settings(&amp;pSet);
+pSet-&gt;put_DisallowStartIfOnBatteries(VARIANT_FALSE);   <span class="c">// 默认 TRUE，会让笔记本静默跳过</span>
+pSet-&gt;put_StopIfGoingOnBatteries(VARIANT_FALSE);      <span class="c">// 默认 TRUE</span>
+pSet-&gt;put_StartWhenAvailable(VARIANT_TRUE);           <span class="c">// 错过时间后开机补跑</span>
+pSet-&gt;put_WakeToRun(VARIANT_TRUE);                    <span class="c">// 可唤醒睡眠中的电脑</span>
+pSet-&gt;put_ExecutionTimeLimit(_bstr_t(L<span class="s">"PT5M"</span>));
+
+<span class="c">// 动作：指向系统固定路径的 shutdown.exe，而非 U 盘上的 PlanPower.exe</span>
+IActionCollection* pActions = <span class="k">nullptr</span>;
+pTask-&gt;get_Actions(&amp;pActions);
+IAction* pAction = <span class="k">nullptr</span>;
+pActions-&gt;Create(TASK_ACTION_EXEC, &amp;pAction);
+IExecAction* pExec = <span class="k">nullptr</span>;
+pAction-&gt;QueryInterface(IID_IExecAction, (<span class="k">void</span>**)&amp;pExec);
+
+<span class="k">wchar_t</span> shutdownPath[MAX_PATH];
+GetSystemDirectoryW(shutdownPath, MAX_PATH);
+wcscat_s(shutdownPath, L<span class="s">"\\shutdown.exe"</span>);          <span class="c">// 固定系统路径，永不失效</span>
+
+pExec-&gt;put_Path(_bstr_t(shutdownPath));
+pExec-&gt;put_Arguments(_bstr_t(L<span class="s">"/s /t 60 /c \"系统将在 60 秒后关机\""</span>));
+
+<span class="c">// 注册到 \PlanPower 文件夹</span>
+IRegisteredTask* pRegistered = <span class="k">nullptr</span>;
+pFolder-&gt;RegisterTaskDefinition(_bstr_t(taskName), pTask, TASK_CREATE_OR_UPDATE,
+                                _variant_t(), _variant_t(), TASK_LOGON_SERVICE_ACCOUNT,
+                                _variant_t(L<span class="s">""</span>), &amp;pRegistered);</code></pre>
+
+  <div class="note warn">
+    <p><b>这段是当初的评估稿，最终实现有四处不同，都记在这里，免得后来的人照抄：</b></p>
+    <ol>
+      <li><b>改用 XML，不用对象模型。</b>逐层 <code>get_/put_</code> 链长且每一步都可能失败，出错面大。现在拼 XML 字符串后交给 <code>put_XmlText</code> —— 「生成什么」变成纯函数，可以在没有 Windows 的机器上离线断言。</li>
+      <li><b>用 <code>GetWindowsDirectoryW</code> + <code>System32</code>，不用 <code>GetSystemDirectoryW</code>。</b>后者在 64 位系统上被 32 位进程调用时会被 WOW64 重定向到 <code>SysWOW64</code>，那不是我们要的目录。</li>
+      <li><b><code>RegisterTaskDefinition</code> 之前必须先 <code>put_XmlText</code>。</b>一步走的时候，XML 写错、权限不够、文件夹不存在、任务重名都返回同一个失败，报错只能写得很含糊——v0.2 那次「注册系统任务失败」查不出原因，就是吃了这个亏。拆成两步后，两阶段的失败文案不同，一眼能看出该查哪一边。</li>
+      <li><b>不要设 <code>put_URI</code>。</b>任务路径本来就由注册时的第一个参数决定、服务端自己推导；手写一个以反斜杠开头的 URI，一旦与注册路径有任何出入就以 <code>0x80041318</code> 被整段拒绝，而报错完全指不到这个元素上。属于没收益、只有风险的字段。</li>
+    </ol>
+  </div>
+
+  <h3>8.3 清理实现</h3>
+  <pre><code><span class="c">// 枚举并删除（不依赖任何本地配置）</span>
+IEnumWorkItems* pEnum = <span class="k">nullptr</span>;
+pFolder-&gt;GetTasks(TASK_ENUM_HIDDEN, &amp;pEnum);
+
+LPWSTR* names = <span class="k">nullptr</span>;
+ULONG fetched = <span class="n">0</span>;
+<span class="k">while</span> (pEnum-&gt;Next(<span class="n">1</span>, &amp;names, &amp;fetched) == S_OK &amp;&amp; fetched == <span class="n">1</span>) {
+    pFolder-&gt;DeleteTask(names[<span class="n">0</span>], <span class="n">0</span>);     <span class="c">// 0 = 不因正在运行而失败</span>
+    CoTaskMemFree(names[<span class="n">0</span>]);
+}
+
+<span class="c">// 仅当文件夹为空时才删除文件夹本身，避免误删其他任务</span>
+pRoot-&gt;DeleteFolder(_bstr_t(L<span class="s">"PlanPower"</span>), <span class="n">0</span>);</code></pre>
+
+  <div class="note">
+    <p><b>为什么用 <code>TASK_ENUM_HIDDEN</code>：</b>如果不带这个标志，被隐藏的任务不会被枚举到，清理就会漏。而我们的任务在任务计划程序 GUI 里可能是隐藏状态，所以必须显式请求枚举隐藏项。</p>
+  </div>
+</section>
+
+<!-- ===== 9 ===== -->
+<section id="s9">
+  <h2><span class="num">9</span>验收标准</h2>
+  <p class="lede">逐条可在虚拟机验证。</p>
+
+  <h3>9.1 默认状态（不开启系统任务）</h3>
+  <ul class="chk">
+    <li><b>零写入：</b>全新运行、创建 5 条内存任务、正常退出。用 Process Monitor 检查，除自身配置文件外<strong>无任何系统写入</strong>，任务计划程序中不存在 <code>\PlanPower</code> 文件夹。</li>
+    <li><b>无 UAC 打扰：</b>全程不弹出任何 UAC 提示。</li>
+    <li><b>干净退出：</b>删除 exe 与配置文件后，机器上无任何残留。</li>
+  </ul>
+
+  <h3>9.2 开启系统任务后</h3>
+  <ul class="chk">
+    <li><b>说明弹窗不可跳过：</b>未勾选确认前，「启用」按钮为禁用状态。</li>
+    <li><b>默认选项正确：</b>创建向导中「内存计时」为默认选中项。</li>
+    <li><b>注册成功可验证：</b>创建一条系统任务后，在 Windows「任务计划程序」中能看到 <code>\PlanPower</code> 文件夹及对应任务，且「作者」字段为 PlanPower (portable)。</li>
+    <li><b>关键设置生效：</b>导出的任务 XML 中，<code>DisallowStartIfOnBatteries</code> 为 <code>false</code>、<code>StartWhenAvailable</code> 与 <code>WakeToRun</code> 为 <code>true</code>、<code>UserId</code> 为 <code>S-1-5-18</code>。</li>
+    <li><b>动作路径正确：</b>任务动作指向 <code>%SystemRoot%\System32\shutdown.exe</code>，<strong>不是</strong> U 盘上的 exe。</li>
+    <li><b>拔盘后仍生效：</b>注册任务后完全退出程序并拔掉 U 盘，任务到点仍然执行。</li>
+    <li><b>UAC 拒绝不丢数据：</b>在 UAC 弹窗点「否」，任务保留为「未注册」状态，配置未丢失，界面有明确提示。</li>
+    <li><b>状态栏可见：</b>状态栏正确显示「本机已注册 N 个系统任务」，点击可直达清理入口。</li>
+  </ul>
+
+  <h3>9.3 清理能力</h3>
+  <ul class="chk">
+    <li><b>任务级清理：</b>删除一条系统任务，任务计划程序中对应条目同步消失。</li>
+    <li><b>一键清理：</b>点击「清理本机全部系统任务」，确认后 <code>\PlanPower</code> 文件夹被完全移除。</li>
+    <li><b>孤儿检测：</b>手动在任务计划程序中创建一个 <code>\PlanPower\测试任务</code>（配置里没有），清理向导能识别并提示为孤儿任务。</li>
+    <li><b>应急清理不依赖配置：</b>删除 INI 文件后执行 <code>PlanPower.exe /cleanup-all</code>，仍能完整清理。</li>
+    <li><b>干跑模式：</b><code>/cleanup-all /dry-run</code> 只列出将要删除的任务，不执行实际删除。</li>
+    <li><b>归属识别：</b>在机器 A 注册任务后，把配置复制到机器 B，机器 B 上正确显示「注册于 [机器 A 名]」且不可编辑。</li>
+    <li><b>退出自动清理：</b>开启该选项后退出程序，任务计划程序中不留任何 PlanPower 条目。</li>
+  </ul>
+
+  <h3>9.4 边界场景</h3>
+  <ul class="chk">
+    <li><b>不支持的组合被拦截：</b>为任务勾选「收尾动作」后，任务类型自动锁定为内存计时，并给出明确说明。</li>
+    <li><b>任务计划程序被禁用：</b>在组策略中禁用任务计划程序服务后启动，程序正常运行，系统任务选项被禁用并说明原因。</li>
+    <li><b>多盘共存：</b>两支 U 盘在同一台机器上各注册任务，清理时只删各自的那批，互不影响。</li>
+    <li><b>中文与特殊字符：</b>任务名含中文、空格、引号时，注册与清理均正常。</li>
+  </ul>
+</section>
+
+<footer>
+  <p><b>PlanPower · 系统级持久任务设计</b>　|　生成日期 2026-10-12</p>
+  <p>本文是《便携版与零依赖专项设计》第 3.2 节 ① 的展开。相关文档：《PlanPower 设计方案（Revision 1）》第 1–4、6–8 章；《PlanPower 便携版与零依赖设计（Revision 2）》全部章节。</p>
+</footer>
+
+</div>
+</body>
+</html>

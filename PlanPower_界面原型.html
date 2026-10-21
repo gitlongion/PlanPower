@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlanPower · 界面原型</title>
+<style>
+  :root{
+    --bg:#eef1f5;
+    --win:#ffffff;
+    --ink:#1f2937;
+    --ink2:#4b5563;
+    --ink3:#8b95a5;
+    --line:#e6e9ee;
+    --line2:#f1f3f6;
+    --brand:#2563eb;
+    --brand2:#1d4ed8;
+    --brandsoft:#eef3ff;
+    --teal:#0d9488;
+    --tealsoft:#e9f9f6;
+    --warn:#c2410c;
+    --warnsoft:#fff5ed;
+    --danger:#dc2626;
+    --dangersoft:#fef2f2;
+    --violet:#7c3aed;
+    --radius:12px;
+    --mono:"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    font-size:14px;-webkit-font-smoothing:antialiased;padding:28px 20px 60px;
+  }
+
+  /* ---------- page header ---------- */
+  .phead{max-width:1000px;margin:0 auto 20px;}
+  .phead h1{font-size:20px;margin:0 0 6px;font-weight:700;letter-spacing:-.01em;}
+  .phead p{margin:0;font-size:13.5px;color:var(--ink3);}
+
+  /* ---------- tabs ---------- */
+  .tabs{max-width:1000px;margin:0 auto 18px;display:flex;gap:8px;flex-wrap:wrap;}
+  .tab{
+    background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 16px;
+    font-size:13.5px;color:var(--ink2);cursor:pointer;font-family:inherit;
+    transition:all .15s;
+  }
+  .tab:hover{border-color:#c7d2e0;}
+  .tab.on{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600;box-shadow:0 2px 8px rgba(37,99,235,.25);}
+
+  /* ---------- fake window ---------- */
+  .stage{max-width:1000px;margin:0 auto;}
+  .win{
+    background:var(--win);border-radius:14px;overflow:hidden;
+    box-shadow:0 12px 40px rgba(23,42,80,.14),0 2px 8px rgba(23,42,80,.06);
+    border:1px solid #dfe4ec;
+  }
+  .titlebar{
+    height:42px;display:flex;align-items:center;padding:0 8px 0 16px;
+    background:#fbfcfd;border-bottom:1px solid var(--line);
+  }
+  .titlebar .logo{
+    width:20px;height:20px;border-radius:6px;flex:none;margin-right:9px;
+    background:linear-gradient(135deg,#2563eb,#0d9488);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;
+  }
+  .titlebar .ttl{font-size:12.5px;color:var(--ink2);font-weight:600;}
+  .titlebar .sp{flex:1;}
+  .wbtn{width:42px;height:42px;display:flex;align-items:center;justify-content:center;color:#9aa3b2;font-size:13px;}
+  .wbtn.close:hover{background:#e81123;color:#fff;}
+
+  /* ---------- app body ---------- */
+  .app{padding:0;}
+  .appbar{
+    display:flex;align-items:center;padding:18px 22px 14px;gap:12px;
+  }
+  .appbar .brand{font-size:17px;font-weight:700;letter-spacing:-.01em;}
+  .appbar .brand small{display:block;font-size:11.5px;color:var(--ink3);font-weight:400;letter-spacing:0;margin-top:1px;}
+  .appbar .sp{flex:1;}
+  .btn{
+    border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 15px;
+    font-size:13.5px;color:var(--ink2);cursor:pointer;font-family:inherit;font-weight:500;
+    display:inline-flex;align-items:center;gap:6px;transition:all .13s;
+  }
+  .btn:hover{border-color:#c7d2e0;background:#fafbfc;}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 1px 3px rgba(37,99,235,.3);}
+  .btn.primary:hover{background:var(--brand2);border-color:var(--brand2);}
+  .btn.icon{padding:8px 10px;}
+
+  .filters{
+    display:flex;align-items:center;gap:6px;padding:0 22px 14px;
+    border-bottom:1px solid var(--line2);flex-wrap:wrap;
+  }
+  .chip{
+    border-radius:7px;padding:6px 12px;font-size:13px;color:var(--ink2);cursor:pointer;
+    border:1px solid transparent;background:transparent;font-family:inherit;
+  }
+  .chip:hover{background:#f5f7fa;}
+  .chip.on{background:var(--brandsoft);color:var(--brand);font-weight:600;}
+  .chip .n{font-size:11.5px;opacity:.7;margin-left:3px;}
+  .filters .sp{flex:1;}
+  .search{
+    border:1px solid var(--line);border-radius:8px;padding:7px 12px 7px 30px;
+    font-size:13px;width:180px;font-family:inherit;color:var(--ink);
+    background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238b95a5' stroke-width='2.4' stroke-linecap='round'><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/></svg>") no-repeat 10px center;
+    outline:none;
+  }
+  .search:focus{border-color:#a9c2f0;box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+
+  /* ---------- task list ---------- */
+  .list{padding:6px 12px 12px;}
+  .task{
+    display:flex;align-items:flex-start;gap:13px;padding:14px 12px;border-radius:10px;
+    transition:background .13s;position:relative;
+  }
+  .task:hover{background:#f8fafc;}
+  .task + .task{border-top:1px solid var(--line2);}
+  .task.off .t-name,.task.off .t-meta,.task.off .t-next{opacity:.45;}
+  .task.off .dot{background:#cbd5e1;}
+
+  .dot{width:9px;height:9px;border-radius:50%;flex:none;margin-top:7px;background:var(--teal);box-shadow:0 0 0 3px var(--tealsoft);}
+  .dot.warm{background:var(--warn);box-shadow:0 0 0 3px var(--warnsoft);}
+  .dot.gray{background:#cbd5e1;box-shadow:0 0 0 3px #f1f5f9;}
+
+  .t-main{flex:1;min-width:0;}
+  .t-name{font-size:14.5px;font-weight:600;margin-bottom:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pill{font-size:11px;font-weight:600;padding:1.5px 7px;border-radius:5px;background:#f1f5f9;color:var(--ink3);}
+  .pill.wake{background:var(--tealsoft);color:var(--teal);}
+  .pill.warm{background:var(--warnsoft);color:var(--warn);}
+  .t-meta{font-size:12.5px;color:var(--ink3);display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .t-meta .sep{color:#dde3ea;}
+
+  .t-right{display:flex;align-items:center;gap:10px;flex:none;}
+  .t-next{text-align:right;font-size:12.5px;color:var(--ink3);line-height:1.5;min-width:112px;}
+  .t-next b{display:block;color:var(--ink2);font-weight:600;font-size:13px;}
+  .t-next.live b{color:var(--brand);font-variant-numeric:tabular-nums;font-size:15px;}
+
+  .tacts{display:flex;gap:2px;opacity:.55;transition:opacity .13s;}
+  .task:hover .tacts{opacity:1;}
+  .iact{
+    width:30px;height:30px;border-radius:7px;border:none;background:transparent;cursor:pointer;
+    color:var(--ink3);font-size:14px;display:flex;align-items:center;justify-content:center;
+  }
+  .iact:hover{background:#eef2f7;color:var(--ink);}
+  .iact.del:hover{background:var(--dangersoft);color:var(--danger);}
+
+  /* switch */
+  .sw{
+    width:38px;height:22px;border-radius:11px;background:#cbd5e1;position:relative;cursor:pointer;
+    flex:none;transition:background .18s;
+  }
+  .sw::after{
+    content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .18s;
+  }
+  .sw.on{background:var(--brand);}
+  .sw.on::after{transform:translateX(16px);}
+
+  .statusbar{
+    display:flex;align-items:center;gap:14px;padding:10px 22px;background:#fafbfc;
+    border-top:1px solid var(--line);font-size:12px;color:var(--ink3);
+  }
+  .statusbar .sp{flex:1;}
+  .badge{display:inline-flex;align-items:center;gap:5px;}
+  .badge i{width:6px;height:6px;border-radius:50%;background:var(--teal);display:block;}
+
+  /* ---------- wizard ---------- */
+  .wiz{padding:0;}
+  .wizsteps{
+    display:flex;align-items:center;gap:0;padding:20px 28px 16px;
+    border-bottom:1px solid var(--line2);
+  }
+  .st{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink3);}
+  .st .c{
+    width:24px;height:24px;border-radius:50%;background:#eef1f5;color:var(--ink3);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;
+  }
+  .st.on{color:var(--ink);font-weight:600;}
+  .st.on .c{background:var(--brand);color:#fff;}
+  .st.done .c{background:var(--tealsoft);color:var(--teal);}
+  .stline{flex:1;height:2px;background:var(--line);margin:0 14px;min-width:24px;}
+  .stline.done{background:#a7e8dd;}
+
+  .wizbody{padding:22px 28px 8px;min-height:290px;}
+  .wizbody h3{font-size:15px;margin:0 0 4px;font-weight:650;}
+  .wizbody .hint{font-size:12.5px;color:var(--ink3);margin:0 0 18px;}
+
+  .acts{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;}
+  @media(max-width:760px){.acts{grid-template-columns:repeat(2,1fr);}}
+  .act{
+    border:1.5px solid var(--line);border-radius:10px;padding:14px 12px;cursor:pointer;
+    text-align:center;transition:all .14s;background:#fff;
+  }
+  .act:hover{border-color:#b8cdf5;background:#fafcff;}
+  .act.on{border-color:var(--brand);background:var(--brandsoft);box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+  .act .ic{font-size:20px;margin-bottom:7px;line-height:1;}
+  .act .nm{font-size:13.5px;font-weight:600;}
+  .act .ds{font-size:11px;color:var(--ink3);margin-top:3px;line-height:1.45;}
+
+  .wizfoot{
+    padding:16px 28px 20px;border-top:1px solid var(--line2);background:#fafbfc;
+  }
+  .preview{
+    background:var(--tealsoft);border:1px solid #b9ece4;border-radius:9px;
+    padding:12px 16px;font-size:13.5px;color:#0f766e;margin-bottom:14px;line-height:1.6;
+  }
+  .preview b{color:#0b5f59;}
+  .preview .lb{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#2ba69a;display:block;margin-bottom:3px;}
+  .wizbtns{display:flex;gap:9px;align-items:center;}
+  .wizbtns .sp{flex:1;}
+
+  /* form bits */
+  .frow{display:grid;grid-template-columns:repeat(2,1fr);gap:11px;margin-bottom:11px;}
+  @media(max-width:760px){.frow{grid-template-columns:1fr;}}
+  .fld{border:1.5px solid var(--line);border-radius:9px;padding:13px 15px;cursor:pointer;transition:all .14s;background:#fff;}
+  .fld:hover{border-color:#b8cdf5;}
+  .fld.on{border-color:var(--brand);background:var(--brandsoft);}
+  .fld .ft{font-size:13.5px;font-weight:600;margin-bottom:2px;}
+  .fld .fd{font-size:12px;color:var(--ink3);}
+
+  .inputs{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0 4px;}
+  .inp{
+    border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13.5px;
+    font-family:inherit;color:var(--ink);outline:none;width:112px;background:#fff;
+  }
+  .inp:focus{border-color:#a9c2f0;box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+  .inp.wide{width:100%;}
+  .inplbl{font-size:12px;color:var(--ink3);display:block;margin-bottom:5px;}
+
+  .opt{display:flex;align-items:center;gap:11px;padding:12px 15px;border:1px solid var(--line);border-radius:9px;margin-bottom:9px;background:#fff;}
+  .opt .tx{flex:1;}
+  .opt .tx .a{font-size:13.5px;font-weight:600;}
+  .opt .tx .b{font-size:12px;color:var(--ink3);margin-top:1px;}
+  .cb{width:19px;height:19px;border-radius:5px;border:1.5px solid #cbd5e1;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent;background:#fff;cursor:pointer;}
+  .cb.on{background:var(--brand);border-color:var(--brand);color:#fff;}
+
+  /* ---------- overlay ---------- */
+  .ovstage{position:relative;height:420px;background:linear-gradient(160deg,#3b4a63,#26324a);border-radius:12px;overflow:hidden;}
+  .ovstage .deskhint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.28);font-size:13px;letter-spacing:.04em;}
+  .overlay{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:rgba(255,255,255,.97);backdrop-filter:blur(10px);
+    border-radius:14px;padding:22px 26px;box-shadow:0 18px 50px rgba(0,0,0,.35);
+    width:330px;text-align:center;
+  }
+  .overlay .hd{font-size:12px;color:var(--ink3);letter-spacing:.05em;text-transform:uppercase;font-weight:600;margin-bottom:8px;}
+  .overlay .big{font-size:44px;font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.1;}
+  .overlay .sub{font-size:13px;color:var(--ink2);margin:8px 0 18px;}
+  .overlay .bar{height:6px;border-radius:3px;background:#e8edf4;overflow:hidden;margin-bottom:18px;}
+  .overlay .bar i{display:block;height:100%;width:62%;background:linear-gradient(90deg,#2563eb,#0d9488);border-radius:3px;}
+  .ovbtns{display:flex;gap:9px;}
+  .ovbtns .btn{flex:1;justify-content:center;}
+
+  /* ---------- tray ---------- */
+  .traystage{
+    position:relative;height:420px;border-radius:12px;overflow:hidden;
+    background:linear-gradient(160deg,#4a5a75,#2c3850);
+  }
+  .taskbar{
+    position:absolute;left:0;right:0;bottom:0;height:44px;background:rgba(20,28,42,.82);
+    backdrop-filter:blur(18px);display:flex;align-items:center;padding:0 10px;gap:6px;
+  }
+  .tbico{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#dbe3ef;font-size:15px;}
+  .tbico.act{background:rgba(255,255,255,.14);}
+  .taskbar .sp{flex:1;}
+  .tray{display:flex;align-items:center;gap:9px;color:#dbe3ef;font-size:11px;padding-right:8px;}
+  .tray .ti{font-size:14px;}
+
+  .traymenu{
+    position:absolute;right:12px;bottom:52px;width:236px;background:#fff;border-radius:11px;
+    box-shadow:0 14px 44px rgba(0,0,0,.4);overflow:hidden;border:1px solid rgba(0,0,0,.06);
+  }
+  .traymenu .mh{padding:12px 15px 9px;border-bottom:1px solid var(--line2);}
+  .traymenu .mh .a{font-size:13px;font-weight:700;}
+  .traymenu .mh .b{font-size:11.5px;color:var(--ink3);margin-top:2px;}
+  .mi{padding:9px 15px;font-size:13.5px;color:var(--ink2);cursor:pointer;display:flex;align-items:center;gap:10px;}
+  .mi:hover{background:#f5f7fa;}
+  .mi .k{margin-left:auto;font-size:11px;color:var(--ink3);font-family:var(--mono);}
+  .mi.sep{border-top:1px solid var(--line2);padding-top:10px;margin-top:2px;}
+  .mi.warn{color:var(--warn);}
+  .mi .ic{width:16px;text-align:center;}
+
+  .caption{max-width:1000px;margin:16px auto 0;font-size:12.5px;color:var(--ink3);line-height:1.7;}
+  .caption b{color:var(--ink2);}
+  .hidden{display:none;}
+</style>
+</head>
+<body>
+
+<div class="phead">
+  <h1>PlanPower · 界面原型</h1>
+  <p>Windows 10 定时电源管理器 — 高保真静态原型。点击下方标签切换三个核心界面。</p>
+</div>
+
+<div class="tabs">
+  <button class="tab on" data-v="main">主界面 · 任务列表</button>
+  <button class="tab" data-v="wizard">新建任务向导</button>
+  <button class="tab" data-v="overlay">倒计时悬浮窗</button>
+  <button class="tab" data-v="tray">系统托盘菜单</button>
+</div>
+
+<div class="stage">
+
+  <!-- ==================== MAIN ==================== -->
+  <div class="win" id="v-main">
+    <div class="titlebar">
+      <div class="logo">P</div>
+      <div class="ttl">PlanPower — 定时电源管理</div>
+      <div class="sp"></div>
+      <div class="wbtn">—</div>
+      <div class="wbtn">▢</div>
+      <div class="wbtn close">✕</div>
+    </div>
+    <div class="app">
+      <div class="appbar">
+        <div class="brand">定时电源管理<small>3 个任务运行中 · 下次执行 今天 23:00</small></div>
+        <div class="sp"></div>
+        <button class="btn icon" title="设置">⚙</button>
+        <button class="btn primary">＋ 新建任务</button>
+      </div>
+
+      <div class="filters">
+        <button class="chip on">全部<span class="n">5</span></button>
+        <button class="chip">运行中<span class="n">3</span></button>
+        <button class="chip">已停用<span class="n">1</span></button>
+        <button class="chip">已完成<span class="n">1</span></button>
+        <div class="sp"></div>
+        <input class="search" placeholder="搜索任务…">
+      </div>
+
+      <div class="list">
+
+        <div class="task">
+          <div class="dot warm"></div>
+          <div class="t-main">
+            <div class="t-name">工作日下班关机
+              <span class="pill">每周</span><span class="pill warm">会丢数据</span>
+            </div>
+            <div class="t-meta">
+              <span>关机</span><span class="sep">·</span>
+              <span>提前 60 秒提醒</span><span class="sep">·</span>
+              <span>优雅关闭</span><span class="sep">·</span>
+              <span>错过补跑</span>
+            </div>
+          </div>
+          <div class="t-right">
+            <div class="t-next">下次执行<b>今天 23:00</b>约 9 小时后</div>
+            <div class="sw on"></div>
+            <div class="tacts">
+              <button class="iact" title="更多">⋯</button>
+              <button class="iact" title="立即执行">▷</button>
+              <button class="iact" title="编辑">✎</button>
+              <button class="iact del" title="删除">🗑</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="task">
+          <div class="dot"></div>
+          <div class="t-main">
+            <div class="t-name">早晨唤醒开机
+              <span class="pill">工作日</span><span class="pill wake">唤醒执行</span>
+            </div>
+            <div class="t-meta">
+              <span>开机（不执行电源动作）</span><span class="sep">·</span>
+              <span>仅接通电源时运行</span><span class="sep">·</span>
+              <span>已注册 RTC 唤醒定时器</span>
+            </div>
+          </div>
+          <div class="t-right">
+            <div class="t-next">下次执行<b>明天 08:30</b>约 18 小时后</div>
+            <div class="sw on"></div>
+            <div class="tacts">
+              <button class="iact" title="更多">⋯</button>
+              <button class="iact" title="立即执行">▷</button>
+              <button class="iact" title="编辑">✎</button>
+              <button class="iact del" title="删除">🗑</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="task">
+          <div class="dot"></div>
+          <div class="t-main">
+            <div class="t-name">下载完成后关机
+              <span class="pill">空闲触发</span>
+            </div>
+            <div class="t-meta">
+              <span>关机</span><span class="sep">·</span>
+              <span>系统空闲 20 分钟后</span><span class="sep">·</span>
+              <span>强制关闭程序</span><span class="sep">·</span>
+              <span>看门狗：检测到 qBittorrent 则跳过</span>
+            </div>
+          </div>
+          <div class="t-right">
+            <div class="t-next">下次执行<b>等待空闲</b>—</div>
+            <div class="sw on"></div>
+            <div class="tacts">
+              <button class="iact" title="更多">⋯</button>
+              <button class="iact" title="立即执行">▷</button>
+              <button class="iact" title="编辑">✎</button>
+              <button class="iact del" title="删除">🗑</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="task">
+          <div class="dot"></div>
+          <div class="t-main">
+            <div class="t-name">30 分钟后睡眠
+              <span class="pill">倒计时</span>
+            </div>
+            <div class="t-meta">
+              <span>睡眠</span><span class="sep">·</span>
+              <span>无提醒</span><span class="sep">·</span>
+              <span>内存计时任务（软件退出后失效）</span>
+            </div>
+          </div>
+          <div class="t-right">
+            <div class="t-next live">剩余时间<b>00:23:41</b>预计 13:45 执行</div>
+            <div class="sw on"></div>
+            <div class="tacts">
+              <button class="iact" title="更多">⋯</button>
+              <button class="iact" title="立即执行">▷</button>
+              <button class="iact" title="编辑">✎</button>
+              <button class="iact del" title="删除">🗑</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="task off">
+          <div class="dot gray"></div>
+          <div class="t-main">
+            <div class="t-name">每晚重启路由器前重启电脑
+              <span class="pill">每天</span><span class="pill">已停用</span>
+            </div>
+            <div class="t-meta">
+              <span>重启</span><span class="sep">·</span>
+              <span>每天 04:00</span><span class="sep">·</span>
+              <span>提前 120 秒提醒</span>
+            </div>
+          </div>
+          <div class="t-right">
+            <div class="t-next">下次执行<b>—</b>任务已停用</div>
+            <div class="sw"></div>
+            <div class="tacts">
+              <button class="iact" title="更多">⋯</button>
+              <button class="iact" title="立即执行">▷</button>
+              <button class="iact" title="编辑">✎</button>
+              <button class="iact del" title="删除">🗑</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="statusbar">
+        <span class="badge"><i></i>已注册 3 个系统计划任务</span>
+        <span>·</span>
+        <span>1 个内存计时任务</span>
+        <span>·</span>
+        <span>最近一次执行：今天 08:30 成功</span>
+        <div class="sp"></div>
+        <span>权限：标准用户</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== WIZARD ==================== -->
+  <div class="win hidden" id="v-wizard">
+    <div class="titlebar">
+      <div class="logo">P</div>
+      <div class="ttl">新建任务 — PlanPower</div>
+      <div class="sp"></div>
+      <div class="wbtn">—</div>
+      <div class="wbtn">▢</div>
+      <div class="wbtn close">✕</div>
+    </div>
+    <div class="wiz">
+      <div class="wizsteps">
+        <div class="st done"><span class="c">✓</span>做什么</div>
+        <div class="stline done"></div>
+        <div class="st done"><span class="c">✓</span>什么时候</div>
+        <div class="stline done"></div>
+        <div class="st on"><span class="c">3</span>细节</div>
+      </div>
+
+      <div class="wizbody">
+        <h3>细节设置</h3>
+        <p class="hint">都有合理默认值，直接点「完成」也可以。</p>
+
+        <div class="frow">
+          <div>
+            <label class="inplbl">提前提醒（秒）</label>
+            <input class="inp" value="60">
+          </div>
+          <div>
+            <label class="inplbl">关机提示文本</label>
+            <input class="inp wide" value="系统将在 60 秒后关机，请保存工作">
+          </div>
+        </div>
+
+        <div class="opt">
+          <div class="cb on">✓</div>
+          <div class="tx">
+            <div class="a">强制关闭仍在运行的程序</div>
+            <div class="b">关闭后，未保存的内容会丢失。不勾选则等待程序自行退出。</div>
+          </div>
+        </div>
+
+        <div class="opt">
+          <div class="cb">✓</div>
+          <div class="tx">
+            <div class="a">仅在接通电源时运行</div>
+            <div class="b">笔记本使用电池时跳过本次任务。</div>
+          </div>
+        </div>
+
+        <div class="opt">
+          <div class="cb on">✓</div>
+          <div class="tx">
+            <div class="a">错过后开机补跑</div>
+            <div class="b">计划时间点电脑处于关机状态时，开机后自动补执行一次。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizfoot">
+        <div class="preview">
+          <span class="lb">任务预览</span>
+          每个工作日 <b>23:00</b> 关闭计算机，提前 <b>60 秒</b> 弹窗提醒，并等待程序自行退出。笔记本使用电池时跳过。
+        </div>
+        <div class="wizbtns">
+          <button class="btn">← 上一步</button>
+          <div class="sp"></div>
+          <button class="btn">取消</button>
+          <button class="btn primary">完成并注册任务</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== OVERLAY ==================== -->
+  <div class="win hidden" id="v-overlay">
+    <div class="titlebar">
+      <div class="logo">P</div>
+      <div class="ttl">倒计时悬浮窗 — 桌面效果预览</div>
+      <div class="sp"></div>
+      <div class="wbtn">—</div>
+      <div class="wbtn">▢</div>
+      <div class="wbtn close">✕</div>
+    </div>
+    <div style="padding:14px;">
+      <div class="ovstage">
+        <div class="deskhint">（桌面背景 · 悬浮窗始终置顶，可拖拽到任意位置）</div>
+        <div class="overlay">
+          <div class="hd">即将关机</div>
+          <div class="big">00:47</div>
+          <div class="sub">「工作日下班关机」将在 47 秒后关闭计算机</div>
+          <div class="bar"><i></i></div>
+          <div class="ovbtns">
+            <button class="btn">取消本次</button>
+            <button class="btn primary">立即关机</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TRAY ==================== -->
+  <div class="win hidden" id="v-tray">
+    <div class="titlebar">
+      <div class="logo">P</div>
+      <div class="ttl">系统托盘 — 桌面效果预览</div>
+      <div class="sp"></div>
+      <div class="wbtn">—</div>
+      <div class="wbtn">▢</div>
+      <div class="wbtn close">✕</div>
+    </div>
+    <div style="padding:14px;">
+      <div class="traystage">
+        <div class="taskbar">
+          <div class="tbico">⊞</div>
+          <div class="tbico act">P</div>
+          <div class="tbico">📁</div>
+          <div class="tbico">🌐</div>
+          <div class="sp"></div>
+          <div class="tray">
+            <span class="ti">🔋</span>
+            <span class="ti">📶</span>
+            <span class="ti">🔊</span>
+            <span id="trayclock">13:21</span>
+          </div>
+        </div>
+
+        <div class="traymenu">
+          <div class="mh">
+            <div class="a">PlanPower</div>
+            <div class="b">3 个任务运行中 · 下次 今天 23:00</div>
+          </div>
+          <div class="mi"><span class="ic">⏱</span>30 分钟后关机<span class="k">快速</span></div>
+          <div class="mi"><span class="ic">⏱</span>60 分钟后关机<span class="k">快速</span></div>
+          <div class="mi"><span class="ic">⏱</span>120 分钟后关机<span class="k">快速</span></div>
+          <div class="mi sep warn"><span class="ic">✕</span>取消当前倒计时</div>
+          <div class="mi"><span class="ic">🌙</span>立即睡眠</div>
+          <div class="mi"><span class="ic">🔒</span>锁定工作站</div>
+          <div class="mi sep"><span class="ic">📋</span>打开主界面</div>
+          <div class="mi"><span class="ic">📜</span>执行历史</div>
+          <div class="mi"><span class="ic">⏻</span>退出</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="caption">
+  <p><b>原型说明：</b>主界面以「一行一个任务」为核心，每行左侧圆点表示状态（青=安全动作 / 橙=会丢数据的关机重启 / 灰=已停用），右侧常驻启用开关与四个行内操作（更多 / 立即执行 / 编辑 / 删除）。倒计时任务在右侧直接显示实时剩余时间并高亮。</p>
+  <p><b>向导</b>共三步，底部固定「任务预览」条，把配置实时翻译成一句自然语言——用户不需要理解触发器概念。<b>悬浮窗</b>在任务执行前 60 秒弹出，置顶可拖拽，提供「取消本次」与「立即关机」。<b>托盘菜单</b>把最高频的三个操作（快速关机、取消倒计时、立即睡眠）放在零层级位置。</p>
+</div>
+
+<script>
+(function(){
+  var tabs = document.querySelectorAll('.tab');
+  var views = {main:'v-main', wizard:'v-wizard', overlay:'v-overlay', tray:'v-tray'};
+  tabs.forEach(function(t){
+    t.addEventListener('click', function(){
+      tabs.forEach(function(x){x.classList.remove('on');});
+      t.classList.add('on');
+      Object.keys(views).forEach(function(k){
+        document.getElementById(views[k]).classList.toggle('hidden', k !== t.dataset.v);
+      });
+    });
+  });
+
+  // 交互演示：开关可点
+  document.querySelectorAll('.sw').forEach(function(s){
+    s.addEventListener('click', function(){ s.classList.toggle('on'); });
+  });
+  // 复选框可点
+  document.querySelectorAll('.cb').forEach(function(c){
+    c.addEventListener('click', function(){
+      c.classList.toggle('on');
+      c.textContent = c.classList.contains('on') ? '✓' : '';
+    });
+  });
+  // 筛选与动作按钮可点
+  document.querySelectorAll('.chip').forEach(function(c){
+    c.addEventListener('click', function(){
+      document.querySelectorAll('.chip').forEach(function(x){x.classList.remove('on');});
+      c.classList.add('on');
+    });
+  });
+  document.querySelectorAll('.act').forEach(function(a){
+    a.addEventListener('click', function(){
+      document.querySelectorAll('.act').forEach(function(x){x.classList.remove('on');});
+      a.classList.add('on');
+    });
+  });
+  document.querySelectorAll('.fld').forEach(function(a){
+    a.addEventListener('click', function(){
+      document.querySelectorAll('.fld').forEach(function(x){x.classList.remove('on');});
+      a.classList.add('on');
+    });
+  });
+
+  // 托盘时钟
+  function tick(){
+    var d = new Date();
+    var el = document.getElementById('trayclock');
+    if(el){ el.textContent = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+  }
+  tick(); setInterval(tick, 20000);
+
+  // 悬浮窗倒计时演示
+  var left = 47;
+  var bigEl = document.querySelector('.overlay .big');
+  var barEl = document.querySelector('.overlay .bar i');
+  if(bigEl){
+    setInterval(function(){
+      left = left <= 1 ? 60 : left - 1;
+      bigEl.textContent = '00:' + String(left).padStart(2,'0');
+      if(barEl){ barEl.style.width = Math.max(2, (left/60)*100) + '%'; }
+    }, 1000);
+  }
+})();
+</script>
+
+</body>
+</html>
