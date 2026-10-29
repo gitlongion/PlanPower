@@ -15,6 +15,7 @@
 
 #include <cstdio>
 #include <string>
+#include <sys/stat.h>
 #include <vector>
 
 static int g_pass = 0;
@@ -86,6 +87,13 @@ static PowerTask MakeTask(PowerAction a, TriggerKind k,
 }
 
 int main() {
+    // 自己建输出目录，不指望外部先建好。
+    //
+    // /tmp 会被系统按天清理，目录一没，后面每个用例的写文件都失败，控制台
+    // 上就是十几条「失败」——看起来像代码坏了，其实只是环境被清了。
+    // 这类假失败比真失败更费时间：它会把注意力引到完全无关的地方。
+    mkdir("/tmp/pp_xml", 0755);
+
     SchedEnv env;
     // 2026-10-13 是星期二，20:00
     env.now       = PpMakeTime(2026, 10, 13, 20, 0, 0);

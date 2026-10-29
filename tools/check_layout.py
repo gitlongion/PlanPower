@@ -1059,6 +1059,52 @@ ck(re.search(r"^rc\s+/nologo\s+/c\s+65001",
    "build_msvc.bat 的 rc.exe 没带 /c 65001 —— 同样的乱码问题")
 
 # ---------------------------------------------------------------------------
+# E25 日志编码：UTF-16LE 必须带 BOM
+#
+# 无 BOM 的 UTF-16LE 在记事本里只能靠猜，在 VS Code / Notepad++ 里必错，
+# 中文任务名全成乱码。和 exe 属性里那个乱码是同一类缺陷：构建不报错、
+# 程序功能也正常，只有用户真的去打开文件才看得见。
+#
+# 所以断言不能只查「有没有写日志」，要查到编码这一层。
+# ---------------------------------------------------------------------------
+log_fn = slice_between(core_c, r"void LogLine\(const wchar_t\* text\)", r"\nvoid LogLine")
+
+ck("TextToUtf16Le" in log_fn,
+   "LogLine 没走 TextToUtf16Le —— 直接把 wchar_t 写盘就没有 BOM，"
+   "记事本 / VS Code 打开是乱码")
+
+# 摘 BOM 的前提是「先知道文件里已经有内容」。少了这个判断，BOM 会落在
+# 文本中间，被当成一个 U+FEFF 显示成方块。
+ck(re.search(r"GetFileSizeEx\(h, &sz\)[\s\S]{0,200}?bytes\.erase\(", log_fn) is not None,
+   "LogLine 追加时没按文件大小摘掉 BOM —— 每行日志前都会多一个 U+FEFF")
+
+ck("EnsureLogBom" in core_c,
+   "没有给老版本日志补 BOM 的迁移 —— 升级后同一个月的老文件仍然乱码，"
+   "用户要等到下个月才有能看的新文件")
+ck("EnsureLogBom(dir)" in log_fn,
+   "EnsureLogBom 定义了却没调用 —— 迁移永远不会发生")
+
+# 补 BOM 必须在整段内容前面插 2 字节。用「原地后移」的话中途失败就把
+# 日志写坏了，所以必须走原子写。
+bom_fn = slice_between(core_c, r"static void EnsureLogBom", r"\nvoid LogLine")
+ck("WriteAllBytesAtomic" in bom_fn,
+   "补 BOM 没用原子写入 —— 中途失败会把日志写坏（为了修显示问题弄丢内容）")
+ck("IsLogFileName" in bom_fn,
+   "补 BOM 没校验文件名 —— 会去动用户自己放进 logs 目录的东西")
+
+# 读取端要跳过 BOM，否则执行历史第一行开头多一个不可见字符
+read_fn = slice_between(ui_code, r"static std::wstring ReadWholeFileUtf16",
+                        r"\nstatic std::wstring BuildHistoryText")
+ck("0xFF" in read_fn and "0xFE" in read_fn,
+   "读取端没跳过 UTF-16LE 的 BOM —— 执行历史第一行开头会多一个 U+FEFF")
+
+# 两处日志必须同一种编码。各写一套的话，某天只改一处就分叉，
+# 表现是「诊断日志能看、执行日志乱码」。
+sched_log = slice_between(sched_c, r"void SchedLog", r"\nvoid ")
+ck("TextToUtf16Le" in sched_log,
+   "SchedLog 没用 TextToUtf16Le —— 两处日志编码会分叉")
+
+# ---------------------------------------------------------------------------
 print("检查项：%d" % checks)
 if fails:
     print("失败 %d 项：" % len(fails))

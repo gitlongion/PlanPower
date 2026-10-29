@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <cwchar>
 #include <vector>
 
@@ -2803,8 +2804,9 @@ static void ShowSettings(HWND owner) {
 // ---------------------------------------------------------------------------
 //  执行历史
 // ---------------------------------------------------------------------------
-// 数据来源就是 LogLine 写的那批文件：`logs\YYYY-MM.log`，UTF-16LE 无 BOM，
-// 一行一条，行首是 `[YYYY-MM-DD HH:MM:SS]`。
+// 数据来源就是 LogLine 写的那批文件：`logs\YYYY-MM.log`，UTF-16LE（带 BOM，
+// v0.4.0 及以前的老文件没有 BOM，读取端两种都认），一行一条，行首是
+// `[YYYY-MM-DD HH:MM:SS]`。
 //
 // 不另建一个「历史」数据结构，理由和日志清理共用 IsLogFileName 是同一条：
 // 同一个事实只能有一份记录。多一份就可能和日志对不上，而用户看到对不上的
@@ -2832,10 +2834,18 @@ static std::wstring ReadWholeFileUtf16(const std::wstring& path) {
     // 也不要把整个文件拖进内存再分页。
     if (GetFileSizeEx(h, &sz) && sz.QuadPart > 0 && sz.QuadPart < (8 << 20)) {
         DWORD n = (DWORD)sz.QuadPart;
-        n -= n % sizeof(wchar_t);        // 奇数字节截掉，免得最后一个字符读到半截
-        out.resize(n / sizeof(wchar_t));
+        std::vector<unsigned char> raw(n);
         DWORD got = 0;
-        if (!ReadFile(h, &out[0], n, &got, nullptr) || got != n) out.clear();
+        if (ReadFile(h, raw.data(), n, &got, nullptr) && got == n) {
+            // 跳过 UTF-16LE 的 BOM。v0.4.0 及以前写的文件没有 BOM，此时
+            // 从 0 开始——两种都要能读，升级不该要求用户清空 logs。
+            size_t off = (n >= 2 && raw[0] == 0xFF && raw[1] == 0xFE) ? 2 : 0;
+            size_t chars = (n - off) / sizeof(wchar_t);   // 奇数字节截掉，免得读到半截字符
+            out.resize(chars);
+            // 用 memcpy 而不是把 raw 强转成 wchar_t*：off 是 2 时指针对不齐，
+            // 在 ARM 上会是未定义行为。x86 上碰巧没事，但不该依赖这一点。
+            if (chars) memcpy(&out[0], raw.data() + off, chars * sizeof(wchar_t));
+        }
     }
     CloseHandle(h);
     return out;

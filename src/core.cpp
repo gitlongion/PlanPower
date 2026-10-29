@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <ctime>
 #include <cwctype>
+#include <vector>
 
 TaskStore g_store;
 
@@ -894,6 +895,72 @@ static void PurgeOldLogs(const std::wstring& dir, int keepMonths) {
     FindClose(h);
 }
 
+// 给老版本写下的日志补 BOM。
+//
+// v0.4.0 及以前的日志是 UTF-16LE **不带 BOM**。这串字节在记事本里要靠猜，
+// 猜错就是整篇乱码；VS Code / Notepad++ 干脆按 UTF-8 或 GBK 解，中文全成
+// 问号。而日志里最值得看的恰恰是中文任务名。
+//
+// 新版本写带 BOM 的，但同一个月的老文件如果不管，用户得等到下个月才能看到
+// 正常内容。所以升级后第一次写日志时把无 BOM 的老文件就地补上。
+//
+// 用原子写入而不是「在开头插 2 字节」：后者要把整段内容后移，中途失败就把
+// 日志写坏了。日志本身不金贵，但「为了修显示问题反而弄丢内容」说不过去。
+static void EnsureLogBom(const std::wstring& dir) {
+    std::wstring pattern = JoinPath(dir, L"*.log");
+    WIN32_FIND_DATAW fd = {};
+    HANDLE h = FindFirstFileW(pattern.c_str(), &fd);
+    if (h == INVALID_HANDLE_VALUE) return;
+
+    do {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+
+        const std::wstring n = fd.cFileName;
+        if (!IsLogFileName(n)) continue;      // 只碰自己写的文件
+
+        const std::wstring path = JoinPath(dir, n);
+
+        HANDLE r = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                               nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (r == INVALID_HANDLE_VALUE) continue;
+
+        LARGE_INTEGER sz = {};
+        unsigned char head[2] = {};
+        DWORD got = 0;
+        bool needFix = false;
+        if (GetFileSizeEx(r, &sz) && sz.QuadPart >= 2 &&
+            ReadFile(r, head, 2, &got, nullptr) && got == 2)
+            needFix = !(head[0] == 0xFF && head[1] == 0xFE);
+        CloseHandle(r);
+
+        if (!needFix) continue;
+        if (sz.QuadPart > (8 << 20)) continue;    // 异常大的文件不动它
+
+        r = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (r == INVALID_HANDLE_VALUE) continue;
+
+        std::vector<unsigned char> bytes;
+        bytes.reserve((size_t)sz.QuadPart + 2);
+        bytes.push_back(0xFF);                    // UTF-16LE BOM
+        bytes.push_back(0xFE);
+
+        bool ok = true;
+        unsigned char buf[8192];
+        for (;;) {
+            DWORD want = 0;
+            if (!ReadFile(r, buf, sizeof(buf), &want, nullptr)) { ok = false; break; }
+            if (want == 0) break;
+            bytes.insert(bytes.end(), buf, buf + want);
+        }
+        CloseHandle(r);
+
+        if (ok) WriteAllBytesAtomic(path, bytes);
+    } while (FindNextFileW(h, &fd));
+
+    FindClose(h);
+}
+
 void LogLine(const wchar_t* text) {
     if (!text || !*text) return;
     if (!g_store.Config().keepLog) return;
@@ -901,11 +968,12 @@ void LogLine(const wchar_t* text) {
     std::wstring dir = JoinPath(ExeDir(), L"logs");
     CreateDirectoryW(dir.c_str(), nullptr);
 
-    // 每次运行清理一次就够，不必每写一行都扫一遍目录。
+    // 每次运行只做一次：先清过期日志，再给剩下的老文件补 BOM。
     static bool purged = false;
     if (!purged) {
         purged = true;
         PurgeOldLogs(dir, g_store.Config().logKeepMonths);
+        EnsureLogBom(dir);
     }
 
     SYSTEMTIME st;
@@ -914,18 +982,30 @@ void LogLine(const wchar_t* text) {
     swprintf(file, 64, L"%04d-%02d.log", st.wYear, st.wMonth);
     std::wstring path = JoinPath(dir, file);
 
-    // 用 Win32 API 直接追加 UTF-16 文本，避免 CRT 的 locale 差异
-    HANDLE h = CreateFileW(path.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ,
-                           nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return;
-
     wchar_t line[1200];
     swprintf(line, 1200, L"[%04d-%02d-%02d %02d:%02d:%02d] %ls\r\n",
              st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
              text);
 
+    // 编码是 UTF-16LE **带 BOM**，和 sched.cpp 的诊断日志同一套。
+    // 走 TextToUtf16Le 而不是直接把 wchar_t 写盘：那个函数已经在处理
+    // 「宿主机 wchar_t 是 32 位、Windows 是 16 位」的差异，两处共用一份。
+    std::vector<unsigned char> bytes;
+    TextToUtf16Le(line, &bytes);
+
+    HANDLE h = CreateFileW(path.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ,
+                           nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return;
+
+    // 只有新建（或恰好为空）的文件才留 BOM。追加时摘掉，否则 BOM 会落在
+    // 文本中间，被当成一个 U+FEFF 显示成方块。
+    LARGE_INTEGER sz = {};
+    if (GetFileSizeEx(h, &sz) && sz.QuadPart > 0 &&
+        bytes.size() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
+        bytes.erase(bytes.begin(), bytes.begin() + 2);
+
     DWORD written = 0;
-    WriteFile(h, line, (DWORD)(wcslen(line) * sizeof(wchar_t)), &written, nullptr);
+    WriteFile(h, bytes.data(), (DWORD)bytes.size(), &written, nullptr);
     CloseHandle(h);
 }
 

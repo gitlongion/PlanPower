@@ -234,6 +234,10 @@ std::wstring   FormatAbsolute(ULONGLONG tickFromNow);
 
 // 简单的日志（可关闭）
 //
+// 编码是 UTF-16LE **带 BOM**，和 sched.cpp 的诊断日志同一套。BOM 不能省：
+// 没有它，记事本对 UTF-16LE 只能靠猜，VS Code / Notepad++ 干脆按 UTF-8 或
+// GBK 解，中文任务名全成乱码——而日志里最值得看的恰恰就是它。
+//
 // 两个重载，指针版是原语，wstring 版转发过去。加指针版不是为了省事：
 //   `LogLine(L"全部暂停")` 只有 wstring 版时，clang 会把 4 个字符直接编成
 //   `movl $imm` 写进 libc++ 的短串缓冲区（SSO），rodata 里那份字面量成了
