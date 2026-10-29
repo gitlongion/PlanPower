@@ -3374,6 +3374,10 @@ static void RegisterClasses() {
 bool UI_Create(HINSTANCE hInst, int nCmdShow, bool startHidden) {
     g_hInst = hInst;
 
+    // 日志维护放在最前面：清过期文件、给老版本写的无 BOM 文件补 BOM。
+    // 早一点做，用户打开日志文件夹时就已经是好的。keepLog 关闭时是空操作。
+    LogMaintenance();
+
     // DPI
     HDC dc = GetDC(nullptr);
     g_dpi = GetDeviceCaps(dc, LOGPIXELSX);

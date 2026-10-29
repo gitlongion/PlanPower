@@ -938,8 +938,8 @@ ck("IsLogFileName(n)" in hist,
    "执行历史没有走共用的命名判断 —— 用户自己放进 logs 的 .log 会被当成本程序记录读进来")
 ck("keepMonths" in purge and "curIndex - idx >= keepMonths" in purge,
    "PurgeOldLogs 没有按保留月数比较 —— 要么不删，要么删光")
-ck("static bool purged" in core_c,
-   "日志清理不是每次运行只做一次 —— 每写一行都扫一遍目录")
+ck(re.search(r"static bool \w+ = false;\s*if \(\w+\) return;", core_c) is not None,
+   "日志维护不是每次运行只做一次 —— 每写一行都扫一遍目录")
 ck("logKeepMonths" in ui_code,
    "设置窗没有日志保留月数的入口 —— 功能在，但用户改不了")
 
@@ -1081,12 +1081,24 @@ ck(re.search(r"GetFileSizeEx\(h, &sz\)[\s\S]{0,200}?bytes\.erase\(", log_fn) is 
 ck("EnsureLogBom" in core_c,
    "没有给老版本日志补 BOM 的迁移 —— 升级后同一个月的老文件仍然乱码，"
    "用户要等到下个月才有能看的新文件")
-ck("EnsureLogBom(dir)" in log_fn,
-   "EnsureLogBom 定义了却没调用 —— 迁移永远不会发生")
+
+# 维护逻辑收在 LogMaintenance 里，LogLine 与 UI_Create 各调一次。
+# 只在 LogLine 里调不够：用户升级后可能好几天不触发任何任务，
+# 那期间老日志一直是乱码的，他会以为没修好。
+maint_fn = slice_between(core_c, r"void LogMaintenance", r"\nvoid LogLine")
+ck("EnsureLogBom(dir)" in maint_fn,
+   "LogMaintenance 里没调 EnsureLogBom —— 迁移永远不会发生")
+ck("PurgeOldLogs" in maint_fn,
+   "LogMaintenance 里没调 PurgeOldLogs —— 过期清理永远不会发生")
+ck("LogMaintenance()" in log_fn,
+   "LogLine 没走 LogMaintenance —— 维护逻辑等于没有")
+ck("LogMaintenance()" in slice_between(ui_code, r"bool UI_Create", r"g_dpi = GetDeviceCaps"),
+   "UI_Create 没调 LogMaintenance —— 升级后要等第一次写日志才修老文件，"
+   "在那之前用户打开 logs 还是乱码")
 
 # 补 BOM 必须在整段内容前面插 2 字节。用「原地后移」的话中途失败就把
 # 日志写坏了，所以必须走原子写。
-bom_fn = slice_between(core_c, r"static void EnsureLogBom", r"\nvoid LogLine")
+bom_fn = slice_between(core_c, r"static void EnsureLogBom", r"\nvoid LogMaintenance")
 ck("WriteAllBytesAtomic" in bom_fn,
    "补 BOM 没用原子写入 —— 中途失败会把日志写坏（为了修显示问题弄丢内容）")
 ck("IsLogFileName" in bom_fn,

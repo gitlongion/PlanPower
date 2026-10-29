@@ -249,6 +249,13 @@ std::wstring   FormatAbsolute(ULONGLONG tickFromNow);
 void LogLine(const wchar_t* text);
 void LogLine(const std::wstring& text);
 
+// 日志目录的一次性维护：清过期文件、给老版本写的无 BOM 文件补上 BOM。
+//
+// 每次运行只做一次，`LogLine` 首次调用时也会触发。另外在 UI_Create 里主动
+// 调一次——用户升级后可能好几天不触发任何任务，那期间老日志一直是乱码的，
+// 他会以为没修好。keepLog 关闭时什么都不做（连目录都不建）。
+void LogMaintenance();
+
 // 判断一个文件名是不是本程序自己写的 `YYYY-MM.log`。
 //
 // 只有一份实现，两个地方用：PurgeOldLogs 决定「能删哪些」，

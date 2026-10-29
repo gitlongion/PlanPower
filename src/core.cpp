@@ -961,20 +961,32 @@ static void EnsureLogBom(const std::wstring& dir) {
     FindClose(h);
 }
 
+void LogMaintenance() {
+    if (!g_store.Config().keepLog) return;
+
+    // 每次运行只做一次。
+    //
+    // 挂成独立函数而不是只藏在 LogLine 里，是因为用户升级后可能好几天不触发
+    // 任何任务——那期间老日志一直是乱码的，他会以为「修了个寂寞」。UI_Create
+    // 里主动调一次，升级后的第一次启动就把文件修好。
+    static bool done = false;
+    if (done) return;
+    done = true;
+
+    std::wstring dir = JoinPath(ExeDir(), L"logs");
+    CreateDirectoryW(dir.c_str(), nullptr);
+    PurgeOldLogs(dir, g_store.Config().logKeepMonths);
+    EnsureLogBom(dir);
+}
+
 void LogLine(const wchar_t* text) {
     if (!text || !*text) return;
     if (!g_store.Config().keepLog) return;
 
+    LogMaintenance();
+
     std::wstring dir = JoinPath(ExeDir(), L"logs");
     CreateDirectoryW(dir.c_str(), nullptr);
-
-    // 每次运行只做一次：先清过期日志，再给剩下的老文件补 BOM。
-    static bool purged = false;
-    if (!purged) {
-        purged = true;
-        PurgeOldLogs(dir, g_store.Config().logKeepMonths);
-        EnsureLogBom(dir);
-    }
 
     SYSTEMTIME st;
     GetLocalTime(&st);
