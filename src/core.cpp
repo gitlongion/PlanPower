@@ -845,26 +845,15 @@ void LocalDatePlusDays(int addDays, int* outY, int* outM, int* outD) {
 
 // 删掉超过保留期的日志。只认严格的 `YYYY-MM.log`——目录里别的文件一律不碰。
 //
-// 这是整个程序里唯一会删除用户文件的地方，所以边界写死在这里：
-//   · 文件名必须正好 11 个字符、第 5 位是 '-'、其余全是数字；
+// 这是整个程序里唯一会删除用户文件的地方，所以边界写死在 logname.h 里：
+//   · 文件名正好 11 个字符，形如 `YYYY-MM.log`；
 //   · 年 2000–9999、月 1–12；
 //   · 只删本程序按 `%04d-%02d.log` 生成的那种名字。
 // 宁可漏删一个不认识的文件，也不要误删一个用户自己放进来的东西。
-bool IsLogFileName(const std::wstring& n) {
-    if (n.size() != 11) return false;            // YYYY-MM.log
-    if (n[4] != L'-') return false;
-
-    for (int i = 0; i < 11; ++i) {
-        if (i == 4) continue;
-        if (n[i] < L'0' || n[i] > L'9') return false;
-    }
-
-    int y = 0, m = 0;
-    for (int i = 0; i < 4; ++i) y = y * 10 + (n[i] - L'0');
-    for (int i = 5; i < 7; ++i) m = m * 10 + (n[i] - L'0');
-    return y >= 2000 && m >= 1 && m <= 12;
-}
-
+//
+// v0.4.1 之前这个函数写在本文件里，把 `.log` 也要求成数字，恒返回 false：
+// 清理、补 BOM、执行历史三处一起静默失效。现在实现抽到 logname.h，
+// 由 tools/lognametest.cpp 在宿主机上真跑。
 static void PurgeOldLogs(const std::wstring& dir, int keepMonths) {
     if (keepMonths <= 0) return;
 

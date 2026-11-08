@@ -1474,6 +1474,10 @@ static LRESULT CALLBACK EditorProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 if (dst) *dst = t;
             }
             g_store.Save();
+            // 常规操作也要留痕。v0.4.1 只有「快捷创建」和「批量启停」写日志，
+            // 用户老老实实新建 / 编辑一个任务，执行历史反而一片空白。
+            LogLine(std::wstring(g_editTaskId.empty() ? L"新建任务：" : L"修改任务：") +
+                    t.name + L" → " + ActionName(t.action));
 
             // ---- 第三步：注册 / 更新系统任务 ----
             // 这一步成功之后，ScheduleTask 会把这条任务从内存计时器里摘出去
@@ -2568,8 +2572,8 @@ static void MakeSettingsControls(HWND h) {
 
     hint(IDC_ST_HINT2);
     SetWindowTextW(GetDlgItem(h, IDC_ST_HINT2),
-        L"把任务的创建、执行、取消记到 exe 同目录的 logs\\ 文件夹，按月分文件。"
-        L"「执行历史」里能看最近的记录。只在需要排查问题时才建议打开。");
+        L"把任务的创建、修改、启停、执行、取消记到 exe 同目录的 logs\\ 文件夹，"
+        L"按月分文件。关闭时「执行历史」会一直是空的；打开后才能看到记录。");
 
     // 托盘快捷关机的三个时长。一个输入框写三个数，比三行输入框省地方，
     // 也比写死三个档位灵活——「临时关一下」的常用档位因人而异。
@@ -2811,10 +2815,11 @@ static void ShowSettings(HWND owner) {
 // 不另建一个「历史」数据结构，理由和日志清理共用 IsLogFileName 是同一条：
 // 同一个事实只能有一份记录。多一份就可能和日志对不上，而用户看到对不上的
 // 时候不知道该信哪个。
-#define IDC_HIST_TEXT  6001
-#define IDC_HIST_OPEN  6002
-#define IDC_HIST_CLOSE 6003
-#define IDC_HIST_TIP   6004
+#define IDC_HIST_TEXT   6001
+#define IDC_HIST_OPEN   6002
+#define IDC_HIST_CLOSE  6003
+#define IDC_HIST_TIP    6004
+#define IDC_HIST_ENABLE 6005
 
 static HWND g_hHist = nullptr;
 
@@ -2908,6 +2913,64 @@ static std::wstring BuildHistoryText() {
     return out;
 }
 
+// 空状态不能只说「还没有执行记录」。
+//
+// v0.4.1 里这句话同时掩盖了三种完全不同的情况：日志开关本来就关着、
+// 开关开着但一次都没写过、日志文件在却读不出来。用户看到「没有记录」
+// 只会以为程序没记，而实际原因可能是一个开关没打开。
+// 现在按原因分别说明，并让调用方拿到「目录里到底有几个本程序的日志」。
+static std::wstring HistoryEmptyText(int* logFiles) {
+    *logFiles = 0;
+    std::wstring dir = JoinPath(ExeDir(), L"logs");
+
+    WIN32_FIND_DATAW fd = {};
+    HANDLE h = FindFirstFileW(JoinPath(dir, L"*.log").c_str(), &fd);
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+            if (IsLogFileName(fd.cFileName)) ++*logFiles;
+        } while (FindNextFileW(h, &fd));
+        FindClose(h);
+    }
+
+    if (!g_store.Config().keepLog) {
+        return L"日志记录目前是关闭的，所以这里没有内容。\r\n\r\n"
+               L"点下面的「开启日志记录」，之后任务的创建、修改、启停、"
+               L"执行和取消都会记到 exe 同目录的 logs\\ 文件夹里。\r\n\r\n"
+               L"（日志开关默认关闭，是为了不在 U 盘上留下多余文件。）";
+    }
+
+    if (*logFiles == 0) {
+        return L"日志已开启，但还没有任何记录。\r\n\r\n"
+               L"新建或修改任务、切换启用开关、手动执行、任务到点触发时"
+               L"才会写一行。\r\n\r\n"
+               L"如果 exe 放在只读目录（例如某些 Program Files 路径），"
+               L"日志会写不进去——可以点「打开日志文件夹」确认位置。";
+    }
+
+    wchar_t n[32];
+    swprintf(n, 32, L"%d", *logFiles);
+    return std::wstring(L"找到 ") + n + L" 个日志文件，但没能读出记录。\r\n\r\n"
+           L"可能是文件正被别的程序占用，或者内容不是本程序写的 UTF-16LE。"
+           L"可以点「打开日志文件夹」查看原始文件。";
+}
+
+// 打开窗口和「开启日志记录」之后都要刷新正文，逻辑收在一处。
+static void RefreshHistoryText(HWND hwnd) {
+    HWND ed = GetDlgItem(hwnd, IDC_HIST_TEXT);
+    if (!ed) return;
+
+    std::wstring text = BuildHistoryText();
+    if (text.empty()) {
+        int n = 0;
+        text = HistoryEmptyText(&n);
+    }
+    SetWindowTextW(ed, text.c_str());
+    // 光标挪到末尾，打开就看到最近一条
+    SendMessageW(ed, EM_SETSEL, (WPARAM)text.size(), (LPARAM)text.size());
+    SendMessageW(ed, EM_SCROLLCARET, 0, 0);
+}
+
 static void HistLayout(HWND h) {
     RECT rc;
     GetClientRect(h, &rc);
@@ -2915,13 +2978,21 @@ static void HistLayout(HWND h) {
     int btnH = S(30);
     int rowY = rc.bottom - pad - btnH;
 
-    int closeW = S(84), openW = S(136);
+    int closeW = S(84), openW = S(136), enW = S(116);
     int closeX = rc.right - pad - closeW;
     int openX  = closeX - S(8) - openW;
 
+    // 「开启日志记录」只在开关关着时出现。隐藏它时不能留一个空洞：
+    // 提示文字要顺势加宽，其余按钮位置不变。
+    HWND en = GetDlgItem(h, IDC_HIST_ENABLE);
+    bool showEnable = en && IsWindowVisible(en);
+    int enX = openX - S(8) - enW;
+    int tipRight = (showEnable ? enX : openX) - S(12);
+
     MoveWindow(GetDlgItem(h, IDC_HIST_CLOSE), closeX, rowY, closeW, btnH, TRUE);
     MoveWindow(GetDlgItem(h, IDC_HIST_OPEN),  openX,  rowY, openW,  btnH, TRUE);
-    MoveWindow(GetDlgItem(h, IDC_HIST_TIP),   pad,    rowY, openX - S(12) - pad, btnH, TRUE);
+    if (showEnable) MoveWindow(en, enX, rowY, enW, btnH, TRUE);
+    MoveWindow(GetDlgItem(h, IDC_HIST_TIP),   pad,    rowY, tipRight - pad, btnH, TRUE);
 
     MoveWindow(GetDlgItem(h, IDC_HIST_TEXT), pad, pad,
                rc.right - pad * 2,
@@ -2937,6 +3008,18 @@ static LRESULT CALLBACK HistoryProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
     case WM_COMMAND:
         switch (LOWORD(wp)) {
+        case IDC_HIST_ENABLE: {
+            // 空状态里最常见的成因就是日志开关没开。给一个就地开关，
+            // 别让用户猜到「设置」里去找。
+            g_store.Config().keepLog = true;
+            g_store.Save();
+            LogMaintenance();
+            LogLine(L"已开启执行日志");
+            ShowWindow(GetDlgItem(hwnd, IDC_HIST_ENABLE), SW_HIDE);
+            RefreshHistoryText(hwnd);
+            HistLayout(hwnd);
+            return 0;
+        }
         case IDC_HIST_OPEN: {
             // 用系统资源管理器打开日志目录，而不是自己做文件管理。
             // 用户要看的是「原始文件」，给他一个记事本能打开的地方就够了。
@@ -2989,15 +3072,7 @@ static void ShowHistory(HWND owner) {
         0, 0, 0, 0, g_hHist, (HMENU)(INT_PTR)IDC_HIST_TEXT, g_hInst, nullptr);
     if (ed) {
         SendMessageW(ed, WM_SETFONT, (WPARAM)g_fBody, TRUE);
-        std::wstring text = BuildHistoryText();
-        if (text.empty())
-            text = L"还没有执行记录。\r\n\r\n"
-                   L"任务真正执行、被暂停/启用、被取消时才会写日志；"
-                   L"如果日志功能是关的，这里会一直是空的（可在「设置」里打开）。";
-        SetWindowTextW(ed, text.c_str());
-        // 光标挪到末尾，打开就看到最近一条
-        SendMessageW(ed, EM_SETSEL, (WPARAM)text.size(), (LPARAM)text.size());
-        SendMessageW(ed, EM_SCROLLCARET, 0, 0);
+        RefreshHistoryText(g_hHist);
     }
 
     wchar_t tip[128];
@@ -3014,8 +3089,17 @@ static void ShowHistory(HWND owner) {
     CreateWindowExW(0, L"BUTTON", L"关闭",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
         0, 0, 0, 0, g_hHist, (HMENU)(INT_PTR)IDC_HIST_CLOSE, g_hInst, nullptr);
-    SendMessageW(GetDlgItem(g_hHist, IDC_HIST_OPEN),  WM_SETFONT, (WPARAM)g_fBody, TRUE);
-    SendMessageW(GetDlgItem(g_hHist, IDC_HIST_CLOSE), WM_SETFONT, (WPARAM)g_fBody, TRUE);
+
+    // 空状态里最常见的成因是日志开关关着。只在那种情况下显示就地开关，
+    // 别让一个用不上的按钮常驻在窗口里。
+    HWND en = CreateWindowExW(0, L"BUTTON", L"开启日志记录",
+        WS_CHILD | (g_store.Config().keepLog ? 0 : WS_VISIBLE) |
+        WS_TABSTOP | BS_PUSHBUTTON,
+        0, 0, 0, 0, g_hHist, (HMENU)(INT_PTR)IDC_HIST_ENABLE, g_hInst, nullptr);
+
+    SendMessageW(GetDlgItem(g_hHist, IDC_HIST_OPEN),   WM_SETFONT, (WPARAM)g_fBody, TRUE);
+    SendMessageW(GetDlgItem(g_hHist, IDC_HIST_CLOSE),  WM_SETFONT, (WPARAM)g_fBody, TRUE);
+    SendMessageW(en, WM_SETFONT, (WPARAM)g_fBody, TRUE);
 
     HistLayout(g_hHist);
     ShowWindow(g_hHist, SW_SHOW);
@@ -3064,6 +3148,7 @@ static void ActivateRowElem(HWND hwnd, int row, int elem) {
                 }
             }
             g_store.Save();
+            LogLine(std::wstring(turnOn ? L"启用任务：" : L"暂停任务：") + copy.name);
             UI_RefreshAll();
             TrayUpdateTip();
             break;
@@ -3108,7 +3193,7 @@ static void ActivateRowElem(HWND hwnd, int row, int elem) {
                     g_store.RemoveTask(copy.id);
                     UI_RefreshAll();
                     TrayUpdateTip();
-                    LogLine(L"删除任务：" + copy.id);
+                    LogLine(std::wstring(L"删除任务：") + copy.name);
                 }
             }
             break;

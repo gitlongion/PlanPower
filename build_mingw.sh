@@ -92,9 +92,13 @@ echo
 #  [可选] 宿主端自检
 #
 #  这套检查存在的理由：macOS 上跑不了 exe，Windows 的运行期行为没法在这里
-#  验证。但「配置文件怎么读写」「任务 XML 长什么样」和「控件摆在哪」这三件事
-#  都是纯逻辑，可以在宿主机上直接编译真实源码、或者用脚本复刻一遍算术来验。
-#  检测到工具就顺手跑，没装就跳过——不影响出包。
+#  验证。但「配置文件怎么读写」「任务 XML 长什么样」「日志文件名怎么认」
+#  和「控件摆在哪」这几件事都是纯逻辑，可以在宿主机上直接编译真实源码、
+#  或者用脚本复刻一遍算术来验。检测到工具就顺手跑，没装就跳过——不影响出包。
+#
+#  其中「日志文件名」这一项是 v0.4.2 补的：v0.4.1 的 IsLogFileName 恒为
+#  false，三个功能一起静默失效，而当时的静态自检查的是「有没有调用共用
+#  判断」，不是「判断对不对」。所以这里编译真实头文件真跑，还带反向验证。
 #
 #  注意 1：这里必须用绝对路径找宿主编译器。LLVM-MinGW 的 bin 目录里也有一个
 #  叫 clang++ 的软链（指向它自带的 clang），上面已经把它加进了 PATH，
@@ -114,7 +118,7 @@ for c in /usr/bin/clang++ /usr/bin/g++ /usr/local/bin/clang++ \
 done
 
 if [ -n "$HOSTCXX" ] && [ -f tools/initest.cpp ]; then
-    echo "[自检 1/4] 配置文件的解析与编解码（编译真实 src/inifile.cpp）..."
+    echo "[自检 1/5] 配置文件的解析与编解码（编译真实 src/inifile.cpp）..."
     if $HOSTCXX -std=c++17 -O1 -Wall -Wextra -Wno-unused-parameter \
          -iquote src tools/initest.cpp src/inifile.cpp -o build/initest; then
         ./build/initest | tail -1 | sed 's/^/    /'
@@ -125,7 +129,7 @@ if [ -n "$HOSTCXX" ] && [ -f tools/initest.cpp ]; then
 fi
 
 if [ -n "$HOSTCXX" ] && [ -f tools/xmltest.cpp ]; then
-    echo "[自检 2/4] 任务 XML 生成（编译真实 src/sched_xml.cpp）..."
+    echo "[自检 2/5] 任务 XML 生成（编译真实 src/sched_xml.cpp）..."
     if $HOSTCXX -std=c++17 -O1 -I tools/hostshim \
          tools/xmltest.cpp src/sched_xml.cpp -o build/xmltest; then
         ./build/xmltest | tail -2 | sed 's/^/    /'
@@ -138,8 +142,36 @@ if [ -n "$HOSTCXX" ] && [ -f tools/xmltest.cpp ]; then
     echo
 fi
 
+if [ -n "$HOSTCXX" ] && [ -f tools/lognametest.cpp ]; then
+    echo "[自检 3/5] 日志文件名判定（编译真实 src/logname.h）..."
+    if $HOSTCXX -std=c++17 -O1 -Wall -Wextra -Wno-unused-parameter \
+         -iquote src tools/lognametest.cpp -o build/lognametest; then
+        # 不能用 `./build/lognametest | tail -2`：管道的退出码是 tail 的，
+        # 测试失败了也照样是 0，set -e 抓不到。先落文件再判退出码。
+        if ./build/lognametest > build/lognametest.out 2>&1; then
+            sed 's/^/    /' build/lognametest.out
+        else
+            sed 's/^/    /' build/lognametest.out
+            echo "    [!] 日志文件名判定自检失败，构建判定为失败。"
+            exit 1
+        fi
+        # 反向验证：换成 v0.4.1 那个恒 false 的实现，必须在这组用例上失败。
+        # 否则说明用例根本抓不住这个缺陷，等于没测。
+        if ./build/lognametest --old >/dev/null 2>&1; then
+            echo "    [!] 反向验证失败：旧实现竟然通过了全部用例。"
+            exit 1
+        else
+            echo "    反向验证：旧实现在这组用例上确实失败 ✓"
+        fi
+        rm -f build/lognametest.out
+    else
+        echo "    （跳过：宿主编译器编译测试桩失败）"
+    fi
+    echo
+fi
+
 if command -v python3 >/dev/null 2>&1 && [ -f tools/check_layout.py ]; then
-    echo "[自检 3/4] 界面布局几何与不变量..."
+    echo "[自检 4/5] 界面布局几何与不变量..."
     python3 tools/check_layout.py | sed 's/^/    /'
     echo
 fi
@@ -147,7 +179,7 @@ fi
 # 文案完整性：把源码里的宽字面量逐条拿到二进制里找一遍。
 # 这条能抓到编译器看不出来的问题——源码对、二进制错（-O2 的常量合并）。
 if command -v python3 >/dev/null 2>&1 && [ -f tools/check_strings.py ]; then
-    echo "[自检 4/4] 界面文案完整性..."
+    echo "[自检 5/5] 界面文案完整性..."
     if python3 tools/check_strings.py build/PlanPower.exe | sed 's/^/    /'; then
         :
     else

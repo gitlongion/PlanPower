@@ -928,12 +928,21 @@ menu = slice_between(ui_code, r"static void ShowTrayMenu", r"\n}")
 ck("quickMinutes[i]" in menu,
    "托盘菜单没读配置里的时长 —— 设置里改了也不生效")
 
-# (3) 日志清理：只认严格命名的文件，而且「能删」与「能读」共用同一份判断
-ck("bool IsLogFileName" in core_h and "bool IsLogFileName" in core_c,
-   "没有 IsLogFileName —— 清理和读取各写一套判断，迟早一个删得比另一个宽")
+# (3) 日志清理：只认严格命名的文件，而且「能删」「能补 BOM」「能读」共用同一份判断
+#
+# 光查「三处有没有调用共用判断」是不够的：v0.4.1 就是三处都调了同一个
+# 恒为 false 的函数，1500 多项断言全绿，三个功能一起静默失效。
+# 所以实现必须在宿主机可编译的纯头里，由 lognametest.cpp 真跑。
+ck('#include "logname.h"' in core_h,
+   "core.h 没有包含 logname.h —— 判断逻辑又回到 .cpp 里，宿主机测不了")
+ck("inline bool IsLogFileName" in strip_comments(read_src("logname.h")),
+   "logname.h 里没有 inline 的 IsLogFileName —— 纯头测试无从谈起")
+ck("bool IsLogFileName(const std::wstring& n)" not in core_c,
+   "core.cpp 里还有一份 IsLogFileName 实现 —— 又变成两处各写一套了")
 purge = slice_between(core_c, r"static void PurgeOldLogs", r"\n}")
 ck("IsLogFileName(n)" in purge, "PurgeOldLogs 没有走共用的命名判断")
-hist = slice_between(ui_code, r"static std::wstring BuildHistoryText", r"\nstatic void HistLayout")
+hist = slice_between(ui_code, r"static std::wstring BuildHistoryText",
+                     r"\nstatic std::wstring HistoryEmptyText")
 ck("IsLogFileName(n)" in hist,
    "执行历史没有走共用的命名判断 —— 用户自己放进 logs 的 .log 会被当成本程序记录读进来")
 ck("keepMonths" in purge and "curIndex - idx >= keepMonths" in purge,
@@ -985,10 +994,31 @@ ck("if (g_hHist) { SetForegroundWindow(g_hHist); return; }" in show_hist,
    "ShowHistory 没防重入 —— 点两次会开出两个窗口，关掉一个另一个还在")
 ck("HIST_MAX_LINES" in show_hist or "HIST_MAX_LINES" in hist,
    "历史没有行数上限 —— 日志攒几个月之后打开会卡")
-ck("text.empty()" in show_hist,
+
+refresh_hist = slice_between(ui_code, r"static void RefreshHistoryText", r"\n}")
+ck("RefreshHistoryText(g_hHist)" in show_hist,
+   "ShowHistory 没走统一的刷新逻辑 —— 打开时和点「开启日志」后会显示两套内容")
+ck("text.empty()" in refresh_hist,
    "没有日志时窗口是空的 —— 用户分不清「没执行过」和「读不到文件」")
-ck("EM_SETSEL" in show_hist,
+ck("EM_SETSEL" in refresh_hist,
    "打开历史没把光标移到末尾 —— 用户得自己滚到底才能看到最近一条")
+
+# 空状态必须给出**原因**，否则「还没有执行记录」会掩盖「日志开关没开」
+# 这一种最常见的情况。v0.4.2 之前就是这么误导人的。
+empty_fn = slice_between(ui_code, r"static std::wstring HistoryEmptyText", r"\n}")
+ck("keepLog" in empty_fn,
+   "空状态没区分「日志开关关着」—— 用户只会以为程序没记日志")
+ck("IsLogFileName" in empty_fn,
+   "空状态数日志文件时没走共用判断 —— 会把用户自己的 .log 也数进去")
+hist_proc = slice_between(ui_code, r"static LRESULT CALLBACK HistoryProc", r"\n}")
+for token, why in [("IDC_HIST_ENABLE", "没有一键开启日志的按钮"),
+                   ("keepLog = true", "按钮没真的把开关打开"),
+                   ("g_store.Save()", "开关改了没落盘，重启又变回关闭"),
+                   ("LogLine", "开启后没写一条记录，用户点了还是看到空白")]:
+    ck(token in hist_proc, "执行历史窗口：%s" % why)
+ck("IDC_HIST_ENABLE" in show_hist, "一键开启按钮没被创建")
+ck("HistLayout(g_hHist)" in show_hist,
+   "按钮创建后没重排布局 —— 「开启日志记录」会压在别的按钮上")
 
 # (6) 键盘与鼠标必须共用一份激活逻辑
 mb = slice_between(ui_code, r"case WM_LBUTTONDOWN", r"case WM_MOUSEMOVE")
@@ -1115,6 +1145,60 @@ ck("0xFF" in read_fn and "0xFE" in read_fn,
 sched_log = slice_between(sched_c, r"void SchedLog", r"\nvoid ")
 ck("TextToUtf16Le" in sched_log,
    "SchedLog 没用 TextToUtf16Le —— 两处日志编码会分叉")
+
+# ---------------------------------------------------------------------------
+# E26 日志文件名判定：必须有真跑的测试，且测试能抓住 v0.4.1 那个缺陷
+#
+# v0.4.1 的 IsLogFileName 要求 11 个字符里除 '-' 外全是数字，真实文件名
+# `2026-11.log` 里的 '.' 和 "log" 显然不是数字 —— 函数恒为 false。
+# 连带后果：执行历史永远空白、过期日志从不清理、老日志 BOM 从没补过。
+# 当时 1500 多项断言查的全是「三处有没有调用共用判断」，没有一条查判断本身。
+#
+# 所以这道防线分两层：
+#   · 下面几条静态断言锁住算式与测试文件/构建链的接线；
+#   · tools/lognametest.cpp 编译真实 logname.h 逐条真跑，并带 --old 反向验证。
+# 只有「查接线」没有「真跑」，就是上一次踩的坑。
+# ---------------------------------------------------------------------------
+logname_h = strip_comments(read_src("logname.h"))
+logtest = read_root("tools/lognametest.cpp")
+build_sh = read_root("build_mingw.sh")
+
+ck(re.search(r"for \(int i = 0; i < 7; \+\+i\)", logname_h) is not None,
+   "IsLogFileName 的数字循环上界不是 7 —— 把 '.' 和 \"log\" 也当数字要求的话，"
+   "函数会对任何真实日志文件名返回 false")
+ck(re.search(r"n\[7\] != L'\.'", logname_h) is not None,
+   "IsLogFileName 没校验第 8 位是点 —— 长度和扩展名的边界没锁住")
+ck(re.search(r"n\[8 \+ i\]", logname_h) is not None,
+   "IsLogFileName 没逐位校验 \"log\" 扩展名 —— 用户的别的 .xxx 文件可能被清理删掉")
+
+# 测试文件必须编译的是真头文件，不是复刻。
+ck('#include "logname.h"' in logtest,
+   "lognametest.cpp 没有包含真实头文件 —— 复刻型测试改了源码照样全绿")
+ck('L"2026-11.log"' in logtest,
+   "lognametest.cpp 里没有当月文件名这条用例 —— v0.4.1 正好漏在它上面")
+ck('L"2026-11.LOG"' in logtest,
+   "lognametest.cpp 没测扩展名大写 —— Windows 文件系统不区分大小写")
+ck('L"notes.log"' in logtest and 'L"2026-11.log.bak"' in logtest,
+   "lognametest.cpp 没测用户自己放进 logs 的文件 —— 误删风险没有守卫")
+ck("OldIsLogFileName" in logtest and "--old" in logtest,
+   "lognametest.cpp 没有旧实现反向验证 —— 无法证明这组用例抓得住那个缺陷")
+
+# 构建链：必须编译、必须真跑、必须对失败敏感、必须跑反向验证。
+ck(re.search(r"tools/lognametest\.cpp -o build/lognametest", build_sh) is not None,
+   "build_mingw.sh 没编译 lognametest.cpp —— 测试文件写了但永远不跑")
+ck("./build/lognametest >" in build_sh,
+   "build_mingw.sh 用管道接 lognametest —— 管道退出码是 tail/sed 的，测试失败也抓不到")
+ck("./build/lognametest --old" in build_sh,
+   "build_mingw.sh 没跑反向验证 —— 用例退化了不会有人发现")
+
+# 修好读取之后，还得有东西可读。v0.4.1 只有「快捷创建」「批量启停」
+# 和到点执行会写日志，用户最常做的「新建 / 编辑 / 单个开关 / 删除」
+# 全都不留痕，历史窗口自然还是一片空白。
+for token, label in [("新建任务：", "新建任务"), ("修改任务：", "编辑保存"),
+                     ("启用任务：", "单个任务启用"), ("暂停任务：", "单个任务暂停"),
+                     ("删除任务：", "删除任务")]:
+    ck(re.search(r"LogLine\([^\n]*" + re.escape(token), ui_code) is not None,
+       "「%s」没有写进日志 —— 执行历史里看不到这个操作" % label)
 
 # ---------------------------------------------------------------------------
 print("检查项：%d" % checks)

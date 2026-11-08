@@ -26,6 +26,8 @@
 #include <vector>
 #include <map>
 
+#include "logname.h"    // IsLogFileName：纯头，清理 / 补 BOM / 执行历史共用一份
+
 // ---------------------------------------------------------------------------
 //  电源动作
 // ---------------------------------------------------------------------------
@@ -256,12 +258,9 @@ void LogLine(const std::wstring& text);
 // 他会以为没修好。keepLog 关闭时什么都不做（连目录都不建）。
 void LogMaintenance();
 
-// 判断一个文件名是不是本程序自己写的 `YYYY-MM.log`。
-//
-// 只有一份实现，两个地方用：PurgeOldLogs 决定「能删哪些」，
-// 执行历史窗决定「能读哪些」。两边各写一套的话迟早会漂移，
-// 而漂移的方向恰好是「清理删得比读取宽」——把用户自己放进 logs
-// 目录的东西删掉。宁可漏删，也不要误删。
-bool IsLogFileName(const std::wstring& name);
+// `IsLogFileName` 的实现在 logname.h（上面已包含），三处共用同一份。
+// 之所以抽成纯头：v0.4.1 的实现恒返回 false，三个功能一起静默失效，
+// 而静态自检只查「有没有走共用判断」，查不出判断本身是错的。
+// 现在 tools/lognametest.cpp 能在宿主机上直接编译这个头逐条验证。
 
 extern TaskStore g_store;
